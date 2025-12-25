@@ -143,11 +143,24 @@ exports.createRequest = async (req, res) => {
 
 exports.getMyRequests = async (req, res) => {
     try {
+        const { page = 1, limit = 10 } = req.query;
+        const offset = (page - 1) * limit;
+
         const [requests] = await db.query(
-            'SELECT * FROM requests WHERE user_id = ? ORDER BY created_at DESC',
+            'SELECT * FROM requests WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+            [req.user.id, parseInt(limit), offset]
+        );
+
+        const [[{ total }]] = await db.query(
+            'SELECT COUNT(*) as total FROM requests WHERE user_id = ?',
             [req.user.id]
         );
-        res.json(requests);
+
+        res.json({
+            requests,
+            total,
+            pages: Math.ceil(total / limit)
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });

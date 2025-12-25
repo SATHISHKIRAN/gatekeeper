@@ -76,3 +76,137 @@ exports.getMe = async (req, res) => {
         res.status(500).json({ message: 'Error fetching user session: ' + error.message });
     }
 };
+
+exports.forgotPasswordInit = async (req, res) => {
+    const { email } = req.body;
+    try {
+        const [users] = await db.query('SELECT phone FROM users WHERE email = ?', [email]);
+        if (users.length === 0) {
+            return res.status(404).json({ message: 'Email not found' });
+        }
+        const phone = users[0].phone;
+        if (!phone) {
+            return res.status(400).json({ message: 'No phone number associated with this account' });
+        }
+        // Mask phone: first and last digit shown (e.g. 9********1)
+        const masked = phone[0] + '*'.repeat(phone.length - 2) + phone[phone.length - 1];
+        res.json({ maskedPhone: masked });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+exports.sendResetOTP = async (req, res) => {
+    const { email, phone } = req.body;
+    try {
+        const [users] = await db.query('SELECT id, phone FROM users WHERE email = ?', [email]);
+        if (users.length === 0) return res.status(404).json({ message: 'User not found' });
+
+        const user = users[0];
+        // Normalize phone for comparison
+        const cleanInputPhone = phone.replace(/\D/g, '');
+        const cleanDBPhone = user.phone ? user.phone.replace(/\D/g, '') : '';
+
+        // Match only last digits if input is shorter, but user said "enter the mobile number 10 digit"
+        // So we strictly clean and compare.
+        if (cleanInputPhone !== cleanDBPhone) {
+            return res.status(400).json({ message: 'Phone number does not match record' });
+        }
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+        await db.query('UPDATE users SET reset_otp = ?, reset_otp_expiry = ? WHERE id = ?', [otp, expiry, user.id]);
+
+        const whatsappService = require('../services/whatsappService');
+        await whatsappService.sendWhatsApp(user.phone, `Your UniVerse GateKeeper Password Reset OTP is: *${otp}*. Valid for 10 minutes.`);
+
+        res.json({ message: 'OTP sent successfully to your WhatsApp number' });
+    } catch (error) {
+        console.error('OTP Send Error:', error);
+        res.status(500).json({ message: 'Failed to send OTP: ' + error.message });
+    }
+};
+
+exports.verifyOTP = async (req, res) => {
+    const { email, otp } = req.body;
+    try {
+        const [users] = await db.query('SELECT id FROM users WHERE email = ? AND reset_otp = ? AND reset_otp_expiry > NOW()', [email, otp]);
+        if (users.length === 0) {
+            return res.status(400).json({ message: 'Invalid or expired OTP' });
+        }
+        res.json({ success: true, message: 'OTP verified' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+exports.resetPassword = async (req, res) => {
+    const { email, otp, newPassword } = req.body;
+    try {
+        const [users] = await db.query('SELECT id FROM users WHERE email = ? AND reset_otp = ? AND reset_otp_expiry > NOW()', [email, otp]);
+        if (users.length === 0) {
+            return res.status(400).json({ message: 'Session expired or invalid. Please restart the process.' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hash = await bcrypt.hash(newPassword, salt);
+
+        await db.query('UPDATE users SET password_hash = ?, reset_otp = NULL, reset_otp_expiry = NULL WHERE id = ?', [hash, users[0].id]);
+        res.json({ success: true, message: 'Password reset successfully' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+exports.forgotEmailInit = async (req, res) => {
+    const { phone } = req.body;
+    try {
+        const cleanPhone = phone.replace(/\D/g, '');
+        const [users] = await db.query('SELECT id, phone FROM users WHERE REPLACE(phone, " ", "") LIKE ?', [`%${cleanPhone}`]);
+
+        if (users.length === 0) {
+            return res.status(404).json({ message: 'Phone number not found' });
+        }
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+        // Update all users with this phone (to handle siblings/family)
+        const userIds = users.map(u => u.id);
+        await db.query('UPDATE users SET reset_otp = ?, reset_otp_expiry = ? WHERE id IN (?)', [otp, expiry, userIds]);
+
+        const whatsappService = require('../services/whatsappService');
+        await whatsappService.sendWhatsApp(users[0].phone, `Your UniVerse GateKeeper Email Recovery OTP is: *${otp}*. Valid for 10 minutes.`);
+
+        res.json({ success: true, message: 'OTP sent to your WhatsApp number' });
+    } catch (error) {
+        console.error('Forgot Email Init Error:', error);
+        res.status(500).json({ message: 'Failed to send OTP: ' + error.message });
+    }
+};
+
+exports.verifyForgotEmailOTP = async (req, res) => {
+    const { phone, otp } = req.body;
+    try {
+        const cleanPhone = phone.replace(/\D/g, '');
+        // Find users with matching phone and valid OTP
+        const [users] = await db.query(
+            'SELECT email FROM users WHERE REPLACE(phone, " ", "") LIKE ? AND reset_otp = ? AND reset_otp_expiry > NOW()',
+            [`%${cleanPhone}`, otp]
+        );
+
+        if (users.length === 0) {
+            return res.status(400).json({ message: 'Invalid or expired OTP' });
+        }
+
+        const emails = users.map(u => u.email);
+
+        // Clear OTP after success
+        await db.query('UPDATE users SET reset_otp = NULL, reset_otp_expiry = NULL WHERE REPLACE(phone, " ", "") LIKE ?', [`%${cleanPhone}`]);
+
+        res.json({ success: true, emails });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};

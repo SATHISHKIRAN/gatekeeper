@@ -169,6 +169,28 @@ const Login = () => {
                         </div>
                     </div>
 
+                    <div className="flex items-center justify-between">
+                        <div className="text-sm">
+                            <button
+                                type="button"
+                                onClick={() => navigate('/forgot-password?flow=email')}
+                                className="font-medium text-gray-500 hover:text-indigo-600 transition-colors"
+                            >
+                                Forgot email?
+                            </button>
+                        </div>
+                        <div className="text-sm">
+                            <button
+                                type="button"
+                                onClick={() => navigate('/forgot-password?flow=password')}
+                                className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors"
+                                style={{ color: primaryColor }}
+                            >
+                                Forgot password?
+                            </button>
+                        </div>
+                    </div>
+
                     <button
                         type="submit"
                         disabled={loading}

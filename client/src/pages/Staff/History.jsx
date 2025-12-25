@@ -1,29 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { motion } from 'framer-motion';
-import { Search, Download, Calendar, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { Search, Download, Calendar, ArrowUpRight, ArrowDownLeft, ArrowLeft, ArrowRight } from 'lucide-react';
 
 const StaffHistory = () => {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('');
+    const [page, setPage] = useState(1);
+    const [pages, setPages] = useState(1);
+    const [total, setTotal] = useState(0);
 
     useEffect(() => {
         fetchHistory();
-    }, []);
+    }, [page]);
 
     const fetchHistory = async () => {
+        setLoading(true);
         try {
-            const res = await axios.get('/api/staff/history');
-            setHistory(res.data);
+            const res = await axios.get(`/api/staff/history?page=${page}&limit=10`);
+            setHistory(res.data.history);
+            setPages(res.data.pages);
+            setTotal(res.data.total);
             setLoading(false);
         } catch (err) {
             console.error(err);
+            setLoading(false);
         }
     };
 
     const handleExport = () => {
-        // Implement export logic similar to MyStudents
         alert("Exporting history...");
     };
 
@@ -37,7 +43,7 @@ const StaffHistory = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Approval History</h1>
-                    <p className="text-gray-500 dark:text-slate-400">Record of all requests processed by your department</p>
+                    <p className="text-gray-500 dark:text-slate-400">Record of all requests processed by your department ({total} total)</p>
                 </div>
                 <div className="flex gap-3">
                     <div className="relative">
@@ -73,7 +79,9 @@ const StaffHistory = () => {
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan="5" className="p-8 text-center text-gray-500">Loading history...</td></tr>
+                                [1, 2, 3].map(i => (
+                                    <tr key={i}><td colSpan="5" className="p-8 text-center text-gray-500 animate-pulse"><div className="h-4 bg-slate-100 dark:bg-slate-800 rounded w-full"></div></td></tr>
+                                ))
                             ) : filteredHistory.length === 0 ? (
                                 <tr><td colSpan="5" className="p-8 text-center text-gray-500">No records found</td></tr>
                             ) : (
@@ -97,8 +105,8 @@ const StaffHistory = () => {
                                         </td>
                                         <td className="p-4">
                                             <span className={`px-2 py-1 rounded-lg text-xs font-bold capitalize ${item.status.includes('approved') ? 'bg-green-100 text-green-700' :
-                                                    item.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                                                        'bg-yellow-100 text-yellow-700'
+                                                item.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                                                    'bg-yellow-100 text-yellow-700'
                                                 }`}>
                                                 {item.status.replace('_', ' ')}
                                             </span>
@@ -112,6 +120,31 @@ const StaffHistory = () => {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination Controls */}
+                {!loading && pages > 1 && (
+                    <div className="px-6 py-4 bg-slate-50/50 dark:bg-slate-800/20 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between">
+                        <p className="text-xs text-slate-500 font-medium font-sans">
+                            Page {page} of {pages}
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <button
+                                disabled={page === 1}
+                                onClick={() => setPage(p => p - 1)}
+                                className="p-2 rounded-xl border border-gray-200 dark:border-slate-700 disabled:opacity-50 hover:bg-white dark:hover:bg-slate-800 transition-colors"
+                            >
+                                <ArrowLeft className="w-4 h-4" />
+                            </button>
+                            <button
+                                disabled={page === pages}
+                                onClick={() => setPage(p => p + 1)}
+                                className="p-2 rounded-xl border border-gray-200 dark:border-slate-700 disabled:opacity-50 hover:bg-white dark:hover:bg-slate-800 transition-colors"
+                            >
+                                <ArrowRight className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

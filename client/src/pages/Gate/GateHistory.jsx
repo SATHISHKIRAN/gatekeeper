@@ -8,7 +8,9 @@ import {
     Calendar,
     ArrowUpRight,
     ArrowDownLeft,
-    Download
+    Download,
+    ArrowLeft,
+    ArrowRight
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -17,6 +19,9 @@ const GateHistory = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState('all'); // all, entry, exit
+    const [page, setPage] = useState(1);
+    const [pages, setPages] = useState(1);
+    const [total, setTotal] = useState(0);
 
     // Stats
     const stats = {
@@ -28,13 +33,15 @@ const GateHistory = () => {
         fetchLogs(true);
         const interval = setInterval(() => fetchLogs(false), 5000); // 5s Auto-Refresh
         return () => clearInterval(interval);
-    }, []);
+    }, [page, searchTerm]);
 
     const fetchLogs = async (showLoading = false) => {
         try {
             if (showLoading) setLoading(true);
-            const res = await axios.get('/api/gate/history'); // Uses the new route returning LOGS
-            setLogs(res.data);
+            const res = await axios.get(`/api/gate/history?page=${page}&limit=10&search=${searchTerm}`);
+            setLogs(res.data.logs);
+            setPages(res.data.pages);
+            setTotal(res.data.total);
             if (showLoading) setLoading(false);
         } catch (err) {
             console.error(err);
@@ -44,11 +51,8 @@ const GateHistory = () => {
 
     const getFilteredLogs = () => {
         return logs.filter(log => {
-            const matchesSearch =
-                log.student_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                log.register_number?.toLowerCase().includes(searchTerm.toLowerCase());
             const matchesType = filterType === 'all' || log.action === filterType;
-            return matchesSearch && matchesType;
+            return matchesType;
         });
     };
 
@@ -66,7 +70,7 @@ const GateHistory = () => {
                             LIVE
                         </span>
                     </div>
-                    <p className="text-gray-500 dark:text-slate-400">Real-time log of all entry and exit movements</p>
+                    <p className="text-gray-500 dark:text-slate-400">Total {total} movements logged</p>
                 </div>
                 <div className="flex gap-3">
                     <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-800 flex items-center gap-4 shadow-sm">
@@ -74,17 +78,8 @@ const GateHistory = () => {
                             <ArrowUpRight className="w-5 h-5" />
                         </div>
                         <div>
-                            <p className="text-xs font-bold text-gray-400 uppercase">Exits Today</p>
+                            <p className="text-xs font-bold text-gray-400 uppercase">Exits</p>
                             <p className="text-xl font-black text-gray-900 dark:text-white">{stats.exits}</p>
-                        </div>
-                    </div>
-                    <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-800 flex items-center gap-4 shadow-sm">
-                        <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                            <ArrowDownLeft className="w-5 h-5" />
-                        </div>
-                        <div>
-                            <p className="text-xs font-bold text-gray-400 uppercase">Entries Today</p>
-                            <p className="text-xl font-black text-gray-900 dark:text-white">{stats.entries}</p>
                         </div>
                     </div>
                 </div>
@@ -98,7 +93,7 @@ const GateHistory = () => {
                         type="text"
                         placeholder="Search by name or register number..."
                         value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
                         className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                     />
                 </div>
@@ -113,7 +108,7 @@ const GateHistory = () => {
                         <option value="entry">Entries Only</option>
                     </select>
                     <button
-                        onClick={fetchLogs}
+                        onClick={() => fetchLogs(true)}
                         className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
                     >
                         <RefreshCcw className={`w-5 h-5 text-gray-600 dark:text-slate-300 ${loading ? 'animate-spin' : ''}`} />
@@ -138,7 +133,7 @@ const GateHistory = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50 dark:divide-slate-800">
-                            {loading ? (
+                            {loading && logs.length === 0 ? (
                                 <tr>
                                     <td colSpan="5" className="p-10 text-center">
                                         <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -190,6 +185,31 @@ const GateHistory = () => {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination Controls */}
+                {pages > 1 && (
+                    <div className="p-5 bg-gray-50/30 dark:bg-slate-800/20 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between">
+                        <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">
+                            Page {page} of {pages}
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                disabled={page === 1}
+                                onClick={() => setPage(p => p - 1)}
+                                className="p-2 rounded-xl border border-gray-200 dark:border-slate-800 disabled:opacity-30 hover:bg-white dark:hover:bg-slate-800 transition-colors"
+                            >
+                                <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-slate-400" />
+                            </button>
+                            <button
+                                disabled={page === pages}
+                                onClick={() => setPage(p => p + 1)}
+                                className="p-2 rounded-xl border border-gray-200 dark:border-slate-800 disabled:opacity-30 hover:bg-white dark:hover:bg-slate-800 transition-colors"
+                            >
+                                <ArrowRight className="w-5 h-5 text-gray-600 dark:text-slate-400" />
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

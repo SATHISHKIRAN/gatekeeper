@@ -68,7 +68,7 @@ app.use(express.static(distPath));
 // ... (all existing app.use('/api/...') remain above or here)
 
 // --- PRODUCTION: Catch-all for SPA (Single Page Application) ---
-app.get('*', (req, res) => {
+app.get(/.*/, (req, res) => {
     // Only handle if not an API route
     if (!req.url.startsWith('/api')) {
         res.sendFile(path.join(distPath, 'index.html'));

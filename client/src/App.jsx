@@ -6,6 +6,7 @@ import { NotificationProvider } from './context/NotificationContext';
 import { SettingsProvider } from './context/SettingsContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
 
 // Placeholder Pages
 import StudentDashboard from './pages/Student/Dashboard';
@@ -64,6 +65,7 @@ function App() {
                     <NotificationProvider>
                         <Routes>
                             <Route path="/" element={<Login />} />
+                            <Route path="/forgot-password" element={<ForgotPassword />} />
 
                             <Route path="/student/dashboard" element={
                                 <ProtectedRoute allowedRoles={['student']}>

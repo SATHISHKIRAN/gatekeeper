@@ -38,25 +38,47 @@ exports.sendNotification = async (recipients, options) => {
             );
 
             // Dispatch Multi-Channel Notifications
+            // Move require to top level in next step or assume it's there
             const whatsappService = require('../services/whatsappService');
-            usersToNotify.forEach(user => {
-                // 1. Browser Push
-                pushService.sendPushNotification(user.id, {
-                    title: title,
-                    body: message,
-                    data: { url: link || '/notifications' }
-                });
+
+            console.log(`[BROADCAST] Starting broadcast to ${usersToNotify.length} users...`);
+
+            for (const user of usersToNotify) {
+                // 1. Browser Push (Fire and forget, or await if critical)
+                try {
+                    pushService.sendPushNotification(user.id, {
+                        title: title,
+                        body: message,
+                        data: { url: link || '/notifications' }
+                    });
+                } catch (pushErr) {
+                    console.error(`[PUSH] Failed for user ${user.id}:`, pushErr);
+                }
 
                 // 2. WhatsApp Notification
                 if (user.phone) {
-                    whatsappService.sendWhatsApp(user.phone, `*${title}*\n\n${message}`);
+                    try {
+                        const sent = await whatsappService.sendWhatsApp(user.phone, `*${title}*\n\n${message}`);
+                        if (sent) {
+                            console.log(`[WHATSAPP] Sent to user ${user.id} (${user.phone})`);
+                        } else {
+                            console.warn(`[WHATSAPP] Failed/Skipped for user ${user.id} (${user.phone}) - Client not ready?`);
+                        }
+                    } catch (waErr) {
+                        console.error(`[WHATSAPP] Error for user ${user.id}:`, waErr);
+                    }
                 }
 
                 // 3. Parental Notification (if applicable)
                 if ((category === 'request' || category === 'security') && user.parent_phone) {
-                    whatsappService.sendWhatsApp(user.parent_phone, `*Alert for Ward*\n\n${title}: ${message}`);
+                    try {
+                        await whatsappService.sendWhatsApp(user.parent_phone, `*Alert for Ward*\n\n${title}: ${message}`);
+                    } catch (parentWaErr) {
+                        console.error(`[WHATSAPP-PARENT] Error for parent of ${user.id}:`, parentWaErr);
+                    }
                 }
-            });
+            }
+            console.log('[BROADCAST] Broadcast completed.');
         }
 
         return { count: userIds.length, userIds };

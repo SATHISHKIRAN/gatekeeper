@@ -100,9 +100,8 @@ exports.getLiveStatus = async (req, res) => {
 
 exports.getHistory = async (req, res) => {
     try {
-        const { search, limit = 50 } = req.query;
-        // Role based access logic can remain or be simplified as this is mostly for Gatekeeper/Admin to view logs
-        // Assuming Gatekeeper sees all.
+        const { search, page = 1, limit = 10 } = req.query;
+        const offset = (page - 1) * limit;
 
         let query = `
             SELECT 
@@ -131,11 +130,18 @@ exports.getHistory = async (req, res) => {
             params.push(`%${search}%`, `%${search}%`);
         }
 
-        query += ` ORDER BY l.timestamp DESC LIMIT ?`;
-        params.push(parseInt(limit));
+        const countQuery = `SELECT COUNT(*) as total FROM (${query}) as t`;
+        const [[{ total }]] = await db.query(countQuery, params);
+
+        query += ` ORDER BY l.timestamp DESC LIMIT ? OFFSET ?`;
+        params.push(parseInt(limit), offset);
 
         const [rows] = await db.query(query, params);
-        res.json(rows);
+        res.json({
+            logs: rows,
+            total,
+            pages: Math.ceil(total / limit)
+        });
 
     } catch (error) {
         console.error(error);

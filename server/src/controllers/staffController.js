@@ -163,21 +163,32 @@ exports.getAnalytics = async (req, res) => {
 exports.getHistory = async (req, res) => {
     try {
         const department_id = req.user.department_id;
-        const staffId = req.user.id; // Strictly speaking, staff history usually means what *they* did
+        const { page = 1, limit = 10 } = req.query;
+        const offset = (page - 1) * limit;
 
-        // Getting all requests that have been processed by department staff (approved_staff) or rejected
-        // Ideally we'd link to staff_actions table, but for now we look at requests in dept
         const [history] = await db.query(
             `SELECT r.*, u.name as student_name, u.year, u.trust_score
              FROM requests r
              JOIN users u ON r.user_id = u.id
              WHERE u.department_id = ? AND r.status NOT IN ('pending')
              ORDER BY r.updated_at DESC
-             LIMIT 100`,
+             LIMIT ? OFFSET ?`,
+            [department_id, parseInt(limit), offset]
+        );
+
+        const [[{ total }]] = await db.query(
+            `SELECT COUNT(*) as total 
+             FROM requests r 
+             JOIN users u ON r.user_id = u.id 
+             WHERE u.department_id = ? AND r.status NOT IN ('pending')`,
             [department_id]
         );
 
-        res.json(history);
+        res.json({
+            history,
+            total,
+            pages: Math.ceil(total / limit)
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error retrieving history' });

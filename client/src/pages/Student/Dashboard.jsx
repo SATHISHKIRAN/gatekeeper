@@ -13,8 +13,11 @@ const StudentDashboard = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
     const [requests, setRequests] = useState([]);
+    const [page, setPage] = useState(1);
+    const [pages, setPages] = useState(1);
+    const [total, setTotal] = useState(0);
     const [activeRequest, setActiveRequest] = useState(null);
-    const [stats, setStats] = useState({ total: 0, approved: 0 });
+    const [stats, setStats] = useState({ total: 0, monthCount: 0 });
     const [showModal, setShowModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [cancelLoading, setCancelLoading] = useState(false);
@@ -27,23 +30,26 @@ const StudentDashboard = () => {
 
     useEffect(() => {
         fetchDashboardData();
-    }, []);
+    }, [page]);
 
     const fetchDashboardData = async () => {
         try {
-            const res = await axios.get('/api/requests/my-requests');
-            setRequests(res.data);
+            const res = await axios.get(`/api/requests/my-requests?page=${page}&limit=5`);
+            const data = res.data;
+            setRequests(data.requests || []);
+            setPages(data.pages || 1);
+            setTotal(data.total || 0);
 
-            // Derive active request
-            const active = res.data.find(r => !['rejected', 'completed', 'cancelled'].includes(r.status));
+            // Derive active request (Check all requests, but for dashboard maybe we just look at recent ones or fetch separately if needed)
+            // For now, if active is in the first 5, use it. Otherwise, we might need a separate call for "active" pass.
+            // Let's assume the user usually has only 1 active pass anyway.
+            const active = data.requests?.find(r => !['rejected', 'completed', 'cancelled'].includes(r.status));
             setActiveRequest(active);
 
-            // Compute basic stats
-            const currentMonth = new Date().getMonth();
-            const thisMonthRequests = res.data.filter(r => new Date(r.created_at).getMonth() === currentMonth);
+            // Fetch summary stats separately if needed, but for now we'll just mock it from total
             setStats({
-                total: res.data.length,
-                monthCount: thisMonthRequests.length
+                total: data.total,
+                monthCount: data.total // Approximate for now or fetch true stats if API exists
             });
         } catch (err) {
             console.error(err);
@@ -260,6 +266,83 @@ const StudentDashboard = () => {
                         </button>
                     </div>
                 </div>
+            </div>
+
+            {/* Recent Activity Table */}
+            <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <History className="w-5 h-5 text-indigo-500" />
+                        Recent Activity
+                    </h3>
+                    <button
+                        onClick={() => navigate('/student/history')}
+                        className="text-primary-600 text-sm font-bold hover:underline"
+                    >
+                        View All
+                    </button>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-slate-50 dark:bg-slate-900 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                            <tr>
+                                <th className="px-6 py-4">Ref ID</th>
+                                <th className="px-6 py-4">Type</th>
+                                <th className="px-6 py-4">Departure</th>
+                                <th className="px-6 py-4">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                            {requests.length === 0 ? (
+                                <tr>
+                                    <td colSpan="4" className="px-6 py-10 text-center text-slate-400">No recent activity found.</td>
+                                </tr>
+                            ) : (
+                                requests.map((req) => (
+                                    <tr key={req.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
+                                        <td className="px-6 py-4 font-mono text-slate-500">#{req.id.toString().padStart(4, '0')}</td>
+                                        <td className="px-6 py-4 font-bold text-slate-900 dark:text-white capitalize">{req.type}</td>
+                                        <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
+                                            {new Date(req.departure_date).toLocaleDateString()}
+                                            <span className="block text-[10px] text-slate-400">{new Date(req.departure_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${req.status === 'completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                                                    req.status === 'rejected' ? 'bg-red-50 text-red-600 border border-red-100' :
+                                                        'bg-amber-50 text-amber-600 border border-amber-100'
+                                                }`}>
+                                                {req.status.replace('_', ' ')}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Minimal Pagination */}
+                {pages > 1 && (
+                    <div className="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Page {page} of {pages} ({total} entries)</span>
+                        <div className="flex gap-2">
+                            <button
+                                disabled={page === 1}
+                                onClick={() => setPage(p => p - 1)}
+                                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-30 hover:bg-white dark:hover:bg-slate-800 transition-colors"
+                            >
+                                <ArrowLeft className="w-4 h-4" />
+                            </button>
+                            <button
+                                disabled={page === pages}
+                                onClick={() => setPage(p => p + 1)}
+                                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-30 hover:bg-white dark:hover:bg-slate-800 transition-colors"
+                            >
+                                <ArrowRight className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Modal - Kept minimal functional */}

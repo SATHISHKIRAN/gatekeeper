@@ -1,15 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Clock, CheckCircle, XCircle, AlertCircle, FileText, Ban } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, AlertCircle, FileText, Ban, ArrowLeft, ArrowRight } from 'lucide-react';
 
 const History = () => {
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(1);
+    const [pages, setPages] = useState(1);
+    const [total, setTotal] = useState(0);
 
     const fetchHistory = async () => {
+        setLoading(true);
         try {
-            const res = await axios.get('/api/requests/my-requests');
-            setRequests(res.data);
+            const res = await axios.get(`/api/requests/my-requests?page=${page}&limit=10`);
+            setRequests(res.data.requests);
+            setPages(res.data.pages);
+            setTotal(res.data.total);
         } catch (err) {
             console.error('Failed to fetch history');
         } finally {
@@ -19,14 +25,12 @@ const History = () => {
 
     useEffect(() => {
         fetchHistory();
-    }, []);
+    }, [page]);
 
     const handleCancel = async (id) => {
-        // if (!confirm('Are you sure you want to cancel this request?')) return;
         try {
             await axios.delete(`/api/requests/${id}`);
             fetchHistory(); // Refresh
-            // alert('Pass cancelled successfully'); // Optional: Replace with toast if available
         } catch (err) {
             alert(err.response?.data?.message || 'Cancellation failed');
         }
@@ -54,14 +58,12 @@ const History = () => {
         }
     };
 
-    if (loading) return <div className="p-8 text-center text-slate-500">Loading history...</div>;
-
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Request History</h1>
-                    <p className="text-slate-500 mt-1">Track and manage your past gate pass applications</p>
+                    <p className="text-slate-500 mt-1">Track and manage your past gate pass applications ({total} total)</p>
                 </div>
             </div>
 
@@ -78,7 +80,13 @@ const History = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                            {requests.length === 0 ? (
+                            {loading ? (
+                                [1, 2, 3].map(i => (
+                                    <tr key={i} className="animate-pulse">
+                                        <td colSpan="5" className="px-6 py-8"><div className="h-4 bg-slate-100 dark:bg-slate-700 rounded w-full"></div></td>
+                                    </tr>
+                                ))
+                            ) : requests.length === 0 ? (
                                 <tr>
                                     <td colSpan="5" className="px-6 py-12 text-center text-slate-500">
                                         <div className="flex flex-col items-center justify-center">
@@ -126,6 +134,31 @@ const History = () => {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination Controls */}
+                {!loading && pages > 1 && (
+                    <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                        <p className="text-xs text-slate-500 font-medium">
+                            Showing page {page} of {pages} ({total} entries)
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <button
+                                disabled={page === 1}
+                                onClick={() => setPage(p => p - 1)}
+                                className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-50 hover:bg-white dark:hover:bg-slate-800 transition-colors"
+                            >
+                                <ArrowLeft className="w-4 h-4" />
+                            </button>
+                            <button
+                                disabled={page === pages}
+                                onClick={() => setPage(p => p + 1)}
+                                className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-50 hover:bg-white dark:hover:bg-slate-800 transition-colors"
+                            >
+                                <ArrowRight className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
