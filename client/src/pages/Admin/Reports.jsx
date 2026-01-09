@@ -544,36 +544,40 @@ const AdminReports = () => {
                                                                     <Search className="w-10 h-10 text-slate-300 dark:text-slate-600" />
                                                                 </div>
                                                             </div>
-                                        </div>
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tfoot className="print-footer-row">
-                                            <tr>
-                                                <td>
-                                                    <div className="flex justify-between items-end mt-12 px-8 pb-4">
-                                                        <div className="text-center">
-                                                            <div className="h-12 w-32 border-b-2 border-slate-300 mb-2"></div>
-                                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Class In-charge</p>
-                                                        </div>
-                                                        <div className="text-center">
-                                                            <div className="h-12 w-32 border-b-2 border-slate-300 mb-2"></div>
-                                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">HOD Signature</p>
-                                                        </div>
-                                                        <div className="text-center">
-                                                            <div className="h-12 w-32 border-b-2 border-slate-300 mb-2"></div>
-                                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Principal / CTO</p>
-                                                        </div>
+                                                        )}
                                                     </div>
-                                                </td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-                )}
-                            </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tfoot className="print-footer-row">
+                                <tr>
+                                    <td>
+                                        <div className="flex justify-between items-end mt-12 px-8 pb-4">
+                                            <div className="text-center">
+                                                <div className="h-12 w-32 border-b-2 border-slate-300 mb-2"></div>
+                                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Class In-charge</p>
+                                            </div>
+                                            <div className="text-center">
+                                                <div className="h-12 w-32 border-b-2 border-slate-300 mb-2"></div>
+                                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">HOD Signature</p>
+                                            </div>
+                                            <div className="text-center">
+                                                <div className="h-12 w-32 border-b-2 border-slate-300 mb-2"></div>
+                                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Principal / CTO</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
                     </div>
-                );
+                )}
+            </div>
+        </div>
+    );
 };
 
-                export default AdminReports;
+export default AdminReports;
