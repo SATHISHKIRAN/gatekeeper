@@ -11,6 +11,7 @@ router.put('/read-all', notificationController.markAllAsRead);
 
 // Register Push Subscription
 router.post('/subscribe', notificationController.subscribe);
+router.get('/vapid-key', notificationController.getVapidKey);
 
 // Admin only: Broadcast
 router.post('/broadcast', authorizeRoles('admin', 'principal', 'hod', 'warden'), notificationController.broadcast);

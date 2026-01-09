@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
-    Search, User, Mail, Phone, Home, Filter, X
+    Search, User, Mail, Phone, Home, Filter, X, XCircle
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Modal from '../../components/Modal';
 
 const WardenStudents = () => {
@@ -15,6 +16,7 @@ const WardenStudents = () => {
     const [studentProfile, setStudentProfile] = useState(null);
     const [profileLoading, setProfileLoading] = useState(false);
     const [filterHostel, setFilterHostel] = useState('all');
+    const [previewImage, setPreviewImage] = useState(null);
 
     useEffect(() => {
         fetchData();
@@ -193,8 +195,24 @@ const WardenStudents = () => {
                         >
                             <div className="flex items-start justify-between mb-4">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-semibold text-lg">
-                                        {student.name.charAt(0)}
+                                    <div
+                                        className="w-12 h-12 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-semibold text-lg overflow-hidden border border-slate-200 dark:border-slate-700 cursor-pointer hover:ring-2 hover:ring-indigo-500 transition-all z-10"
+                                        onClick={(e) => {
+                                            if (student.profile_image) {
+                                                e.stopPropagation();
+                                                setPreviewImage(`/img/student/${student.profile_image}`);
+                                            }
+                                        }}
+                                    >
+                                        {student.profile_image ? (
+                                            <img
+                                                src={`/img/student/${student.profile_image}`}
+                                                alt={student.name}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            student.name.charAt(0)
+                                        )}
                                     </div>
                                     <div>
                                         <h3 className="font-semibold text-slate-900 dark:text-white group-hover:text-indigo-600 transition-colors">{student.name}</h3>
@@ -312,8 +330,24 @@ const WardenStudents = () => {
                     <div className="p-6 space-y-6">
                         {/* Header */}
                         <div className="flex items-center gap-4 pb-6 border-b border-slate-200 dark:border-slate-700">
-                            <div className="w-16 h-16 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 text-2xl font-bold">
-                                {studentProfile.student.name.charAt(0)}
+                            <div
+                                className="w-16 h-16 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 text-2xl font-bold overflow-hidden cursor-pointer hover:ring-2 hover:ring-indigo-500 transition-all z-10"
+                                onClick={(e) => {
+                                    if (studentProfile.student.profile_image) {
+                                        e.stopPropagation();
+                                        setPreviewImage(`/img/student/${studentProfile.student.profile_image}`);
+                                    }
+                                }}
+                            >
+                                {studentProfile.student.profile_image ? (
+                                    <img
+                                        src={`/img/student/${studentProfile.student.profile_image}`}
+                                        alt={studentProfile.student.name}
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    studentProfile.student.name.charAt(0)
+                                )}
                             </div>
                             <div className="flex-1">
                                 <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{studentProfile.student.name}</h2>
@@ -400,6 +434,39 @@ const WardenStudents = () => {
                     </div>
                 )}
             </Modal>
+            {/* Image Preview Modal */}
+            <AnimatePresence>
+                {previewImage && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm"
+                        onClick={() => setPreviewImage(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="relative max-w-4xl max-h-[90vh] w-full h-full flex flex-col items-center justify-center"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <button
+                                onClick={() => setPreviewImage(null)}
+                                className="absolute top-4 right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white backdrop-blur-md transition-colors z-50"
+                            >
+                                <XCircle className="w-8 h-8" />
+                            </button>
+                            <img
+                                src={previewImage}
+                                alt="Full Preview"
+                                className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl border-2 border-white/20"
+                            />
+                            <p className="mt-4 text-white/50 text-sm font-medium uppercase tracking-widest">Click anywhere outside to close</p>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

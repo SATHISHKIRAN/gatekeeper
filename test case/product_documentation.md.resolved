@@ -1,0 +1,121 @@
+# UniVerse GateKeeper - Product Documentation
+
+## 1. Executive Summary
+**UniVerse GateKeeper** is a comprehensive, digital gate pass and campus security management system designed for educational institutions. It automates the traditional paper-based pass system, ensuring secure, tracked, and efficient movement of students, staff, and visitors. The system utilizes role-based access control (RBAC), Digital ID verification, and hierarchical approval workflows to maintain campus security.
+
+---
+
+## 2. High-Level Design (HLD)
+
+### 2.1 Architecture
+The system follows a standard **Client-Server Architecture**:
+*   **Frontend (Client)**: A React.js Single Page Application (SPA) providing responsive interfaces for Mobile (Students) and Desktop/Tablet (Management).
+*   **Backend (Server)**: A Node.js/Express REST API that handles business logic, authentication, and request processing.
+*   **Database**: MySQL relational database for structured data storage (Users, Requests, Logs, Configurations).
+
+### 2.2 Core Data Flow
+1.  **Request Initiation**: User (Student) submits data -> Server validates & stores as `pending`.
+2.  **Approval Chain**: Staff/HOD/Warden query pending requests -> Approve/Reject actions update status.
+3.  **Pass Generation**: Upon final approval, the pass becomes valid for verification.
+4.  **Verification**: Gatekeeper enters Student ID Number -> Server validates Pass Status + Timestamp -> Grants Entry/Exit.
+
+---
+
+## 3. Low-Level Design (LLD) & Data Model
+
+### 3.1 Key Database Entities
+*   **Users**: Stores all actors with `role` enum ('student', 'staff', 'hod', 'warden', 'gatekeeper', 'admin').
+*   **Requests**: The core transaction table. Tracks `status` transitions: `pending` -> `approved_staff` -> `approved_hod` -> `generated` -> `active` -> `completed`.
+*   **Logs**: Immutable audit trail of every gate action (Entry/Exit timestamps).
+*   **Visitor_Passes**: Separate handling for non-student guests.
+
+### 3.2 Security Modules
+*   **JWT Authentication**: Stateless session management.
+*   **ID Verification**: Real-time status checks on ID entry.
+*   **Role Middleware**: Strict API route protection (e.g., only HODs can hit `/medical-override`).
+
+---
+
+## 4. Key Modules & Features
+
+### 4.1 Student Module
+*   **Pass Application**: Apply for 'Home', 'Outing', or 'Emergency' passes.
+*   **Digital Status**: View active pass details.
+*   **History**: View past entry/exit logs.
+
+### 4.2 Management Module (Staff/HOD/Warden)
+*   **Hierarchical Approvals**: Multi-stage approval capability.
+*   **Mentorship View**: Staff can view and manage their specific assigned mentees.
+*   **Proxy System**: HODs can delegate authority to other staff members temporarily.
+*   **Bulk Actions**: One-click approval for mass requests.
+
+### 4.3 Gatekeeper Module
+*   **Manual Entry System**: Primary method for verification using Student Register Number.
+*   **Live Validation**: Instant feedback on pass status (Approved/Expired/Already Out).
+*   **Visitor Management**: Registration and tracking of external guests and contract workers.
+*   **Live Monitor**: Real-time view of campus population count.
+
+### 4.4 Admin Module
+*   **System Configuration**: Global settings, maintenance mode, year changeovers.
+*   **User Management**: CRUD operations for all system users.
+*   **Analytics**: High-level reporting on pass trends and violations.
+
+---
+
+## 5. Workflows & Rules (The "Law" of the Product)
+
+This section defines the strict rules governing every role.
+
+### 👮 Role: Student
+*   **Rule 1 (Quota)**: Cannot apply for a new pass if an existing pass is `active`, `pending`, or `approved`.
+*   **Rule 2 (Cooldown)**: May be subject to a cooldown period after a late return or violation.
+*   **Rule 3 (Hierarchy)**: Cannot bypass their assigned Mentor; requests must go to the Mentor first.
+
+### 🧑‍🏫 Role: Staff (Mentor)
+*   **Rule 1 (Scope)**: Can only view and approve requests for allocated Mentees.
+*   **Rule 2 (Accountability)**: Their approval is the *first* required step in the chain.
+*   **Rule 3 (Rejection)**: Must provide a reason for rejection, which is visible to the student.
+
+### 🎓 Role: HOD (Head of Department)
+*   **Rule 1 (Override)**: Has "God Mode" for their department. Can issue **Medical Override** passes that bypass all checks (quotas, cooldowns, times).
+*   **Rule 2 (Blocking)**: Can globally block a specific student or an entire Year Group (e.g., "Block 1st Years") from applying.
+*   **Rule 3 (Delegation)**: Can set a "Proxy". The Proxy user *inherits* HOD permissions for the set duration.
+
+### 🛡️ Role: Gatekeeper
+*   **Rule 1 (The Check)**: The *only* role physically allowing movement.
+*   **Rule 2 (Validation)**: Cannot allow exit if the pass date is in the future.
+*   **Rule 3 (Closure)**: Every "Exit" event *must* eventually have a corresponding "Entry" (or be auto-closed by system) to reset the student's cycle.
+
+### ⚙️ Role: Admin
+*   **Rule 1 (Immutability)**: Rarely touches day-to-day passes; focuses on Master Data (Users, Depts).
+*   **Rule 2 (Emergency)**: Can trigger "Maintenance Mode" which locks the entire system for non-admins.
+
+---
+
+## 6. Advanced Workflow: The "Perfect Pass" Cycle
+
+1.  **Application**: Student applies for Outing (Sat 10:00 AM - 6:00 PM).
+2.  **L1 Approval**: Staff receives notification -> Checks attendance -> Approves.
+3.  **L2 Approval (Optional)**: If 'Home' pass, HOD/Warden approval is required.
+4.  **Generation**: Pass status changes to `Active/Generated` in the system.
+5.  **Exit**: Student reaches gate @ 10:05 AM -> Guard enters ID Number -> System Confirms -> Action: "Check-out".
+6.  **Return**: Student returns @ 5:55 PM -> Guard enters ID Number -> System Confirms -> Action: "Check-in".
+7.  **Closure**: Cycle ends, Student is free to apply again.
+
+---
+
+## 7. Advantages & Disadvantages
+
+### ✅ Advantages
+*   **Security & Accountability**: Every movement is recorded; no "fake paper slips".
+*   **Efficiency**: Reduces gate wait times from minutes to seconds.
+*   **Parental Assurance**: (Future) SMS triggers to parents upon exit/entry.
+*   **Data-Driven**: HODs can identify "frequent flyers" or students abusing outing privileges.
+*   **Sustainability**: 100% Paperless.
+
+### ⚠️ Disadvantages / Risks
+*   **Dependency on Hardware**: Requires students to have charged smartphones.
+*   **Connectivity**: Gatekeepers need stable internet for real-time validation.
+*   **Single Point of Failure**: If the Server goes down, manual fallback protocols (paper) must be ready.
+
+---

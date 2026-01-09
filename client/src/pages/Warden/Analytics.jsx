@@ -69,8 +69,8 @@ const WardenAnalytics = () => {
                             <p className="text-sm text-slate-600 dark:text-slate-400">Movement by hour</p>
                         </div>
                     </div>
-                    <div className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div className="h-80 w-full">
+                        <ResponsiveContainer width={500} height="100%" minWidth={10} minHeight={10} style={{ width: '99%' }}>
                             <AreaChart data={analytics.peakHours}>
                                 <defs>
                                     <linearGradient id="colorPeak" x1="0" y1="0" x2="0" y2="1">
@@ -111,8 +111,8 @@ const WardenAnalytics = () => {
                             <p className="text-sm text-slate-600 dark:text-slate-400">Distribution by type</p>
                         </div>
                     </div>
-                    <div className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div className="h-80 w-full">
+                        <ResponsiveContainer width={500} height="100%" minWidth={10} minHeight={10} style={{ width: '99%' }}>
                             <PieChart>
                                 <Pie
                                     data={analytics.typeDistribution}
@@ -157,8 +157,8 @@ const WardenAnalytics = () => {
                             <p className="text-sm text-slate-600 dark:text-slate-400">Movement by department</p>
                         </div>
                     </div>
-                    <div className="h-96">
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div className="h-96 w-full">
+                        <ResponsiveContainer width={500} height="100%" minWidth={10} minHeight={10} style={{ width: '99%' }}>
                             <BarChart data={analytics.deptStats} layout="vertical">
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                                 <XAxis type="number" stroke="#94a3b8" style={{ fontSize: '12px' }} />

@@ -5,51 +5,72 @@ exports.getProfile = async (req, res) => {
     try {
         const studentId = req.user.id;
 
-        // Fetch user details with Mentor info aliased
+        // Fetch user details with Mentor, Hostel, Room, and Warden info aliased
         const [users] = await db.query(`
             SELECT 
                 u.id, u.name, u.email, u.role, u.department_id, u.trust_score, 
-                u.student_type, u.register_number, u.year, u.phone,
+                u.student_type, u.register_number, u.year, u.phone, u.status, u.profile_image,
                 m.name as mentor_name, 
                 m.email as mentor_email, 
                 m.phone as mentor_phone, 
-                m.register_number as mentor_register_number
+                m.register_number as mentor_register_number,
+                h.name as hostel_name,
+                r.room_number,
+                w.name as warden_name,
+                w.email as warden_email,
+                w.phone as warden_phone,
+                w.register_number as warden_register_number
             FROM users u
             LEFT JOIN users m ON u.mentor_id = m.id
+            LEFT JOIN hostels h ON u.hostel_id = h.id
+            LEFT JOIN rooms r ON u.room_id = r.id
+            LEFT JOIN users w ON h.warden_id = w.id
             WHERE u.id = ?
         `, [studentId]);
 
         if (users.length === 0) return res.status(404).json({ message: 'User not found' });
         const user = users[0];
 
-        // Fetch Department Name (Mock join or separate query if needed, but for now assuming dept_id is enough or we fetch name)
-        // Ideally we would JOIN departments table, but assuming schema simplicity for now
-
-        let profileData = { ...user };
-
-        if (user.student_type === 'hostel') {
-            const [assignments] = await db.query(`
-                SELECT 
-                    r.room_number, 
-                    h.name as hostel_name, 
-                    u.name as warden_name,
-                    u.email as warden_email,
-                    u.phone as warden_phone,
-                    u.register_number as warden_register_number
-                FROM hostel_assignments ha 
-                JOIN rooms r ON ha.room_id = r.id 
-                JOIN hostels h ON r.hostel_id = h.id 
-                LEFT JOIN users u ON h.warden_id = u.id 
-                WHERE ha.student_id = ? AND ha.status = 'active'
-            `, [studentId]);
-
-            if (assignments.length > 0) {
-                profileData.hostel_details = assignments[0];
-            } else {
-                profileData.hostel_details = { hostel_name: 'Not Assigned', room_number: 'N/A', warden_name: 'N/A' };
-            }
+        // Check if mentor is on leave
+        let mentorOnLeave = false;
+        if (user.mentor_id) {
+            const [leaves] = await db.query(
+                `SELECT * FROM staff_leaves 
+                 WHERE user_id = ? AND status = 'approved' 
+                 AND CURDATE() BETWEEN start_date AND end_date`,
+                [user.mentor_id]
+            );
+            if (leaves.length > 0) mentorOnLeave = true;
         }
 
+        // Construct profile data
+        let profileData = {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            department_id: user.department_id,
+            trust_score: user.trust_score,
+            student_type: user.student_type,
+            register_number: user.register_number,
+            year: user.year,
+            phone: user.phone,
+            profile_image: user.profile_image,
+            status: user.status || 'Active', // Default to Active if null
+            mentor_name: user.mentor_name,
+            mentor_email: user.mentor_email,
+            mentor_phone: user.mentor_phone,
+            mentor_register_number: user.mentor_register_number,
+            mentor_on_leave: mentorOnLeave, // New Field
+            hostel_details: {
+                hostel_name: user.hostel_name || 'Not assigned',
+                room_number: user.room_number || 'N/A',
+                warden_name: user.warden_name || 'N/A',
+                warden_email: user.warden_email,
+                warden_phone: user.warden_phone,
+                warden_register_number: user.warden_register_number
+            }
+        };
 
         res.json(profileData);
     } catch (error) {
@@ -152,63 +173,5 @@ exports.changePassword = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Password change failed' });
-
-    }
-};
-
-exports.getWalletData = async (req, res) => {
-    try {
-        const studentId = req.user.id;
-
-        // 1. Fetch Student Identity Details
-        const [users] = await db.query(
-            'SELECT id, name, email, register_number, year, student_type, department_id FROM users WHERE id = ?',
-            [studentId]
-        );
-        if (users.length === 0) return res.status(404).json({ message: 'User not found' });
-        const user = users[0];
-
-        // 2. Fetch Active Pass (if any)
-        // Active = approved_warden, generated, or approved_hod (for day scholars)
-        // And not expired (return_date > now) - optional strict check, but usually status drives visibility
-        const [activeRequests] = await db.query(`
-            SELECT * FROM requests 
-            WHERE user_id = ? 
-            AND status IN ('approved_warden', 'generated', 'approved_hod')
-            AND return_date > NOW() 
-            ORDER BY created_at DESC LIMIT 1
-        `, [studentId]);
-
-        let activePass = activeRequests.length > 0 ? activeRequests[0] : null;
-
-        // Special check: Day scholars with approved_hod are active. 
-        // Hostel students with approved_hod are NOT active (waiting for warden).
-        if (activePass && activePass.status === 'approved_hod' && user.student_type !== 'day_scholar') {
-            activePass = null;
-        }
-
-        // 3. Fetch History (Last 10 completed/expired/rejected)
-        const [history] = await db.query(`
-            SELECT * FROM requests 
-            WHERE user_id = ? 
-            AND (status IN ('completed', 'rejected', 'cancelled') OR return_date <= NOW())
-            ORDER BY created_at DESC 
-            LIMIT 10
-        `, [studentId]);
-
-        res.json({
-            identity: {
-                name: user.name,
-                reg_no: user.register_number,
-                year: user.year,
-                type: user.student_type,
-                dept_id: user.department_id
-            },
-            activePass,
-            history
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Error fetching wallet data' });
     }
 };

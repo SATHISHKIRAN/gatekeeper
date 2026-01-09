@@ -13,7 +13,7 @@ async function resetPassword() {
     try {
         const connection = await mysql.createConnection(dbConfig);
 
-        const password = 'Password123';
+        const password = 'admin123';
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const [result] = await connection.query(

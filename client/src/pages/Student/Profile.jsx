@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { User, Lock, Mail, Hash, BookOpen, MapPin, Building, ShieldCheck, Phone, Bus, UserCheck } from 'lucide-react';
+import { User, Lock, Mail, Hash, BookOpen, MapPin, Building, ShieldCheck, Phone, Bus, UserCheck, XCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import StatusRing from '../../components/StatusRing';
 
 const Profile = () => {
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
+    const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -43,7 +45,7 @@ const Profile = () => {
     if (loading) return <div className="p-8 text-center text-slate-500">Loading profile...</div>;
     if (!profile) return <div className="p-8 text-center text-red-500">Failed to load profile</div>;
 
-    const isHostel = profile.student_type === 'hostel';
+    const isHostel = profile.student_type?.toLowerCase() === 'hostel';
 
     return (
         <div className="max-w-5xl mx-auto space-y-6">
@@ -57,9 +59,27 @@ const Profile = () => {
                         <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-r from-indigo-500 to-purple-600 opacity-20" />
 
                         <div className="relative flex flex-col md:flex-row items-center md:items-end gap-6 pt-8 px-4">
-                            <div className="w-28 h-28 bg-white dark:bg-slate-800 rounded-2xl p-1 shadow-lg -mt-12 md:mt-0">
-                                <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white text-4xl font-bold shadow-inner border-2 border-white dark:border-slate-700">
-                                    {profile.name.charAt(0)}
+
+
+                            <div
+                                className="w-28 h-28 bg-white dark:bg-slate-800 rounded-2xl p-1 shadow-lg -mt-12 md:mt-0 cursor-pointer transition-transform hover:scale-105 active:scale-95 group"
+                                onClick={() => profile.profile_image && setIsImageModalOpen(true)}
+                            >
+                                <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white text-4xl font-bold shadow-inner border-2 border-white dark:border-slate-700 overflow-hidden relative">
+                                    {profile.profile_image ? (
+                                        <>
+                                            <img
+                                                src={`/img/student/${profile.profile_image}`}
+                                                alt={profile.name}
+                                                className="w-full h-full object-cover"
+                                            />
+                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                                                {/* Hover overlay hint could go here if desired */}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        profile.name.charAt(0)
+                                    )}
                                 </div>
                             </div>
 
@@ -123,7 +143,12 @@ const Profile = () => {
                                 </div>
                                 <div>
                                     <p className="text-xs text-slate-400">Academic Status</p>
-                                    <p className="font-medium text-slate-900 dark:text-white text-sm">Active</p>
+                                    <p className={`font-medium text-sm ${profile.status === 'Suspended' ? 'text-red-500 font-bold' :
+                                        profile.status === 'Inactive' ? 'text-slate-500' :
+                                            'text-emerald-600 dark:text-emerald-400'
+                                        }`}>
+                                        {profile.status || 'Active'}
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -311,6 +336,40 @@ const Profile = () => {
                     </div>
                 </div>
             </div>
+            {/* Full Screen Image Modal */}
+            {/* Full Screen Image Modal */}
+            <AnimatePresence>
+                {isImageModalOpen && profile.profile_image && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm"
+                        onClick={() => setIsImageModalOpen(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="relative max-w-4xl max-h-[90vh] w-full h-full flex flex-col items-center justify-center"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <button
+                                onClick={() => setIsImageModalOpen(false)}
+                                className="absolute top-4 right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white backdrop-blur-md transition-colors z-50"
+                            >
+                                <XCircle className="w-8 h-8" />
+                            </button>
+                            <img
+                                src={`/img/student/${profile.profile_image}`}
+                                alt={profile.name}
+                                className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl border-2 border-white/20"
+                            />
+                            <p className="mt-4 text-white/50 text-sm font-medium uppercase tracking-widest">Click anywhere outside to close</p>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

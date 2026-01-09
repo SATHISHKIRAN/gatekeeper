@@ -3,6 +3,7 @@ import Modal from './Modal';
 import axios from 'axios';
 import { AlertCircle, Save } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
 
 const EditRequestModal = ({ isOpen, onClose, request, onUpdate }) => {
     const { user } = useAuth();
@@ -12,6 +13,7 @@ const EditRequestModal = ({ isOpen, onClose, request, onUpdate }) => {
         departure_date: '',
         return_date: ''
     });
+    // const [loading, setLoading] = useState(false); // Managed by toast now mostly, but we can keep if we want to disable button properly without toast relying
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -29,13 +31,17 @@ const EditRequestModal = ({ isOpen, onClose, request, onUpdate }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
+        const toastId = toast.loading('Updating request...');
         setError('');
 
         try {
             await axios.put(`/api/requests/${request.id}`, formData);
             onUpdate(); // Call parent refresh
             onClose();
+            toast.success('Updated Successfully', { id: toastId });
         } catch (err) {
+            console.error(err);
+            toast.error(err.response?.data?.message || 'Update failed', { id: toastId });
             setError(err.response?.data?.message || 'Failed to update request');
         } finally {
             setLoading(false);
@@ -59,7 +65,7 @@ const EditRequestModal = ({ isOpen, onClose, request, onUpdate }) => {
                         value={formData.type}
                         onChange={e => setFormData({ ...formData, type: e.target.value })}
                     >
-                        {user?.student_type === 'day_scholar' ? (
+                        {user?.student_type?.toLowerCase().includes('day') ? (
                             <>
                                 <option value="Leave">Casual Leave</option>
                                 <option value="On Duty">Academic On-Duty (OD)</option>

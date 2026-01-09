@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import {
     Search, UserPlus, Edit2, Trash2, Users, Briefcase,
@@ -8,6 +9,7 @@ import {
 import Modal from '../../components/Modal';
 
 const AdminStaff = () => {
+    const { user } = useAuth();
     const [staff, setStaff] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -97,6 +99,10 @@ const AdminStaff = () => {
     };
 
     const handleDeleteUser = async (id) => {
+        if (user?.role === 'principal') {
+            toast.error("Principals cannot delete records. Please mark as Inactive instead.");
+            return;
+        }
         if (!window.confirm('Delete this staff member?')) return;
         const previousStaff = [...staff];
         setStaff(staff.filter(s => s.id !== id));
@@ -171,6 +177,8 @@ const AdminStaff = () => {
 
     const getRoleConfig = (role) => {
         switch (role) {
+            case 'admin': return { icon: ShieldCheck, color: 'indigo', label: 'Admin' };
+            case 'principal': return { icon: Briefcase, color: 'violet', label: 'Principal' };
             case 'hod': return { icon: Briefcase, color: 'orange', label: 'HOD' };
             case 'warden': return { icon: ShieldCheck, color: 'purple', label: 'Warden' };
             case 'staff': return { icon: Users, color: 'blue', label: 'Staff' };
@@ -350,7 +358,7 @@ const AdminStaff = () => {
                                                     <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1"></div>
                                                     <button
                                                         onClick={() => handleDeleteUser(member.id)}
-                                                        className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+                                                        className={`p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors ${user?.role === 'principal' ? 'hidden' : ''}`}
                                                         title="Delete"
                                                     >
                                                         <Trash2 className="w-4 h-4" />
@@ -447,6 +455,7 @@ const AdminStaff = () => {
                                 <option value="hod">HOD</option>
                                 <option value="warden">Warden</option>
                                 <option value="gatekeeper">Gatekeeper</option>
+
                             </select>
                         </div>
                         <div>
@@ -461,6 +470,15 @@ const AdminStaff = () => {
                                     <option key={d.id} value={d.id}>{d.name}</option>
                                 ))}
                             </select>
+                        </div>
+                        <div className="sm:col-span-2">
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Phone</label>
+                            <input
+                                type="tel" value={newUser.phone}
+                                onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
+                                className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                placeholder="+1 (555) 000-0000"
+                            />
                         </div>
                     </div>
                     <div className="flex gap-3 pt-4">
@@ -500,6 +518,14 @@ const AdminStaff = () => {
                                 className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                             />
                         </div>
+                        <div className="sm:col-span-2">
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Email</label>
+                            <input
+                                type="email" value={selectedUser?.email || ''}
+                                onChange={(e) => setSelectedUser({ ...selectedUser, email: e.target.value })}
+                                className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            />
+                        </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Role</label>
                             <select
@@ -511,6 +537,7 @@ const AdminStaff = () => {
                                 <option value="hod">HOD</option>
                                 <option value="warden">Warden</option>
                                 <option value="gatekeeper">Gatekeeper</option>
+
                             </select>
                         </div>
                         <div>

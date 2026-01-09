@@ -21,9 +21,10 @@ exports.getHostels = async (req, res) => {
 };
 
 exports.createHostel = async (req, res) => {
-    const { name, type, description, warden_id } = req.body;
+    const { name, type, description, warden_id, capacity } = req.body;
     try {
-        await db.query('INSERT INTO hostels (name, type, description, warden_id) VALUES (?, ?, ?, ?)', [name, type, description, warden_id || null]);
+        await db.query('INSERT INTO hostels (name, type, description, warden_id, capacity) VALUES (?, ?, ?, ?, ?)',
+            [name, type, description, warden_id || null, capacity || 0]);
         res.json({ message: 'Hostel created successfully' });
     } catch (error) {
         console.error(error);
@@ -33,9 +34,10 @@ exports.createHostel = async (req, res) => {
 
 exports.updateHostel = async (req, res) => {
     const { id } = req.params;
-    const { name, type, description, warden_id } = req.body;
+    const { name, type, description, warden_id, capacity } = req.body;
     try {
-        await db.query('UPDATE hostels SET name = ?, type = ?, description = ?, warden_id = ? WHERE id = ?', [name, type, description, warden_id || null, id]);
+        await db.query('UPDATE hostels SET name = ?, type = ?, description = ?, warden_id = ?, capacity = ? WHERE id = ?',
+            [name, type, description, warden_id || null, capacity || 0, id]);
         res.json({ message: 'Hostel updated successfully' });
     } catch (error) {
         console.error(error);
@@ -45,8 +47,13 @@ exports.updateHostel = async (req, res) => {
 
 exports.deleteHostel = async (req, res) => {
     try {
-        await db.query('DELETE FROM hostels WHERE id = ?', [req.params.id]);
-        res.json({ message: 'Hostel deleted successfully' });
+        const { id } = req.params;
+        // Explicitly unassign students first as requested
+        await db.query('UPDATE users SET hostel_id = NULL WHERE hostel_id = ?', [id]);
+
+        // Then delete the hostel
+        await db.query('DELETE FROM hostels WHERE id = ?', [id]);
+        res.json({ message: 'Hostel deleted successfully. Students moved to Unassigned.' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Error deleting hostel' });
@@ -187,13 +194,14 @@ exports.unassignRoom = async (req, res) => {
 };
 
 // --- Analytics ---
+// --- Analytics ---
 exports.getHostelStats = async (req, res) => {
     try {
         const [stats] = await db.query(`
             SELECT 
                 (SELECT COUNT(*) FROM hostels) as total_blocks,
-                (SELECT COUNT(*) FROM rooms) as total_capacity,
-                (SELECT COUNT(*) FROM rooms WHERE status = 'available') as available_slots,
+                (SELECT COALESCE(SUM(capacity), 0) FROM hostels) as total_capacity,
+                ((SELECT COALESCE(SUM(capacity), 0) FROM hostels) - (SELECT COUNT(*) FROM users WHERE hostel_id IS NOT NULL AND role = 'student')) as available_slots,
                 (SELECT COUNT(*) FROM users WHERE hostel_id IS NOT NULL AND role = 'student') as occupied_slots,
                 (SELECT COUNT(*) FROM rooms WHERE status = 'maintenance') as maintenance_rooms
         `);
@@ -289,7 +297,7 @@ exports.getUnassignedHostelStudents = async (req, res) => {
             SELECT id, name, register_number, year, email, phone 
             FROM users 
             WHERE role = 'student' 
-            AND student_type = 'Hostel' 
+            AND LOWER(student_type) = 'hostel' 
             AND hostel_id IS NULL
             ORDER BY year DESC, register_number
         `);

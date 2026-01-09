@@ -9,6 +9,8 @@ router.use(verifyToken);
 router.post('/apply', authorizeRoles('student'), requestController.createRequest);
 router.get('/my-requests', requestController.getMyRequests);
 router.delete('/:id', authorizeRoles('student'), requestController.cancelRequest);
+
 router.put('/:id', authorizeRoles('student'), requestController.editRequest);
+router.get('/:id/timeline', requestController.getTimeline);
 
 module.exports = router;

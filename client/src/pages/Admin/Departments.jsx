@@ -298,7 +298,6 @@ const AdminDepartments = () => {
                                     </div>
                                     <div>
                                         <h3 className="font-semibold text-slate-900 dark:text-white">{dept.name}</h3>
-                                        <p className="text-xs text-slate-500">{dept.code}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-1">
@@ -306,7 +305,7 @@ const AdminDepartments = () => {
                                         onClick={() => {
                                             setSelectedId(dept.id);
                                             setIsEditing(true);
-                                            setFormData({ ...formData, dept: { name: dept.name, code: dept.code, description: dept.description || '', hod_id: dept.hod_id || '' } });
+                                            setFormData({ ...formData, dept: { name: dept.name, code: '', description: dept.description || '', hod_id: dept.hod_id || '' } });
                                             setModals(m => ({ ...m, dept: true }));
                                         }}
                                         className="p-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
@@ -449,16 +448,6 @@ const AdminDepartments = () => {
                             required
                             value={formData.dept.name}
                             onChange={(e) => setFormData({ ...formData, dept: { ...formData.dept, name: e.target.value } })}
-                            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Code</label>
-                        <input
-                            type="text"
-                            required
-                            value={formData.dept.code}
-                            onChange={(e) => setFormData({ ...formData, dept: { ...formData.dept, code: e.target.value } })}
                             className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         />
                     </div>

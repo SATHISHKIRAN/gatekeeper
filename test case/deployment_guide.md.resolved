@@ -1,0 +1,143 @@
+# UniVerse GateKeeper - Campus Server Deployment Guide
+
+This guide details how to deploy the **UniVerse GateKeeper** application on your campus server and configure it to run under your college domain (e.g., `gate.college.edu`).
+
+---
+
+## 🏗️ Prerequisites
+*   **Server**: Ubuntu 20.04/22.04 LTS (Recommended) or Windows Server.
+*   **Domain**: A DNS A-Record pointing `gate.college.edu` to your server's IP.
+*   **Software**: Node.js (v18+), MySQL, Nginx (or Apache).
+
+---
+
+## 🚀 1. Backend Setup (API)
+
+### **Step 1: Install Dependencies**
+Navigate to the server folder and install packages.
+```bash
+cd /path/to/gate/server
+npm install
+```
+
+### **Step 2: Environment Configuration**
+Create a `.env` file in the `server` directory with your production details:
+```env
+PORT=5000
+DB_HOST=localhost
+DB_USER=root
+DB_PASS=your_mysql_password
+DB_NAME=universe_gatekeeper
+JWT_SECRET=super_secure_random_string
+FRONTEND_URL=https://gate.college.edu
+```
+
+### **Step 3: Database Setup**
+Log in to MySQL and create the database schema:
+```sql
+CREATE DATABASE universe_gatekeeper;
+```
+Then run the seeding/migration script (or import [schema.sql](file:///c:/Users/mahesh-13145/Downloads/sk/gate/server/schema.sql)):
+```bash
+mysql -u root -p universe_gatekeeper < schema.sql
+```
+
+### **Step 4: Process Management (PM2)**
+Use PM2 to keep the server running in the background forever.
+```bash
+npm install -g pm2
+pm2 start src/app.js --name "gatekeeper-api"
+pm2 save
+pm2 startup
+```
+*Your backend is now running on `localhost:5000`.*
+
+---
+
+## 🎨 2. Frontend Setup (Client)
+
+### **Step 1: Build for Production**
+Navigate to the client folder and build the React app.
+```bash
+cd /path/to/gate/client
+npm install
+```
+
+**Crucial**: Before building, update `client/src/config.js` (or env) so the API URL points to your domain, not localhost!
+```javascript
+// Example config change
+const API_URL = "https://gate.college.edu/api"; 
+```
+
+Now, build the static files:
+```bash
+npm run build
+```
+This creates a `dist` folder. **This folder contains your website.**
+
+### **Step 2: Deploy Static Files**
+Move the contents of `dist` to a standardized web server directory:
+```bash
+sudo mkdir -p /var/www/gatekeeper/html
+sudo cp -r dist/* /var/www/gatekeeper/html/
+```
+
+---
+
+## 🌐 3. Nginx Configuration (The Bridge)
+
+This step makes your app accessible via `gate.college.edu` and handles routing.
+
+Create a new configuration file: `/etc/nginx/sites-available/gatekeeper`
+
+```nginx
+server {
+    listen 80;
+    server_name gate.college.edu;  # <--- YOUR COLLAGE DOMAIN
+
+    root /var/www/gatekeeper/html;
+    index index.html;
+
+    # 1. Serve Frontend (React App)
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 2. Proxy API Requests to Backend
+    location /api/ {
+        proxy_pass http://localhost:5000/; # Points to Node.js
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+Enable the site and restart Nginx:
+```bash
+sudo ln -s /etc/nginx/sites-available/gatekeeper /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+---
+
+## 🔒 4. SSL (HTTPS) - Final Touch
+For security, you **must** use HTTPS. Use Certbot (Let's Encrypt) to get a free certificate:
+```bash
+sudo apt install certbot python3-certbot-nginx
+sudo certbot --nginx -d gate.college.edu
+```
+
+---
+
+## ✅ Checklist
+1.  [ ] Database created and schema imported.
+2.  [ ] API running via PM2 (`pm2 list` shows it active).
+3.  [ ] Frontend built (`npm run build`) and moved to `/var/www`.
+4.  [ ] Nginx configured to serve `/` from folder and `/api` from localhost:5000.
+5.  [ ] SSL Certificate installed.
+
+**Done!** Your application is now live at `https://gate.college.edu`.

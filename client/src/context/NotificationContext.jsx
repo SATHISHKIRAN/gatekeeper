@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { AnimatePresence, motion } from 'framer-motion';
 import { X, CheckCircle, Info, Shield, AlertTriangle } from 'lucide-react';
 import { useAuth } from './AuthContext';
 
@@ -17,10 +16,8 @@ const Toast = ({ toast, onClose }) => {
     };
 
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+
+        <div
             className="fixed bottom-6 right-6 z-50 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-2xl rounded-xl p-4 flex items-start gap-4 max-w-sm"
         >
             <div className="shrink-0 mt-0.5">{icons[toast.type] || icons.info}</div>
@@ -31,7 +28,7 @@ const Toast = ({ toast, onClose }) => {
             <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
                 <X className="w-4 h-4" />
             </button>
-        </motion.div>
+        </div>
     );
 };
 
@@ -57,9 +54,23 @@ export const NotificationProvider = ({ children }) => {
                 if (isPolling && lastNotifIdRef.current && latest.id > lastNotifIdRef.current) {
                     // New notification arrived!
                     showToast(latest.title, latest.message, latest.type);
-                    // Play sound?
-                    const audio = new Audio('/notification.mp3'); // Assuming file exists or fails silently
-                    audio.play().catch(() => { });
+
+                    // Trigger System Notification if minimized or hidden
+                    if (Notification.permission === 'granted' && (document.hidden || !document.hasFocus())) {
+                        try {
+                            const n = new Notification(latest.title, {
+                                body: latest.message,
+                                icon: '/logo192.png',
+                                tag: 'gate-system-alert'
+                            });
+                            n.onclick = () => {
+                                window.focus();
+                                n.close();
+                            };
+                        } catch (e) {
+                            console.error('System notification failed', e);
+                        }
+                    }
                 }
                 lastNotifIdRef.current = latest.id;
             }
@@ -93,63 +104,112 @@ export const NotificationProvider = ({ children }) => {
         setTimeout(() => setToast(null), 5000);
     };
 
-    const subscribeToPush = async () => {
-        try {
-            if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-                console.warn('Push messaging is not supported');
-                return;
-            }
+    const [permissionStatus, setPermissionStatus] = useState(Notification.permission);
 
-            const registration = await navigator.serviceWorker.register('/sw.js');
-            await navigator.serviceWorker.ready;
-
-            const permission = await Notification.requestPermission();
-            if (permission !== 'granted') return;
-
-            const publicVapidKey = 'BCPlQrWyWi3JyCMDZ3VOS5tLIj_1uKZWnIZtxj8rxBCM7y6q6qbOiT0CukkgjqfL2kum4xWTJrFRnd2vuTxHrLU';
-
-            const subscription = await registration.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
-            });
-
-            await axios.post('/api/notifications/subscribe', { subscription });
-            console.log('Push subscription successful');
-        } catch (err) {
-            console.error('Push subscription failed:', err);
-        }
-    };
-
-    function urlBase64ToUint8Array(base64String) {
-        const padding = '='.repeat((4 - base64String.length % 4) % 4);
-        const base64 = (base64String + padding)
-            .replace(/-/g, '+')
-            .replace(/_/g, '/');
-        const rawData = window.atob(base64);
-        const outputArray = new Uint8Array(rawData.length);
-        for (let i = 0; i < rawData.length; ++i) {
-            outputArray[i] = rawData.charCodeAt(i);
-        }
-        return outputArray;
-    }
-
+    // Initial subscription check
     useEffect(() => {
         if (user) {
-            fetchNotifications(false); // Initial fetch
-            subscribeToPush(); // Subscribe to push
-            const interval = setInterval(() => fetchNotifications(true), 15000); // Poll every 15s
+            fetchNotifications(false);
+            if (Notification.permission === 'granted') {
+                subscribeToPush();
+            }
+            const interval = setInterval(() => fetchNotifications(true), 15000);
             return () => clearInterval(interval);
         }
     }, [user]);
 
+    const [pushLoading, setPushLoading] = useState(false);
+
+    const requestPermission = async () => {
+        setPushLoading(true);
+        try {
+            const permission = await Notification.requestPermission();
+            setPermissionStatus(permission);
+            if (permission === 'granted') {
+                await subscribeToPush();
+                showToast('Notifications Enabled', 'You will now receive instant updates.', 'success');
+            } else {
+                showToast('Permission Needed', 'Please enable notifications in your browser settings.', 'warning');
+            }
+        } catch (error) {
+            console.error('Permission request failed', error);
+        } finally {
+            setPushLoading(false);
+        }
+    };
+
+    const subscribeToPush = async () => {
+        try {
+            if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+            // 1. Fetch VAPID Key dynamically from server
+            const { data } = await axios.get('/api/notifications/vapid-key');
+            const publicVapidKey = data.publicKey;
+
+            if (!publicVapidKey) {
+                console.warn('No VAPID key found');
+                return;
+            }
+
+            const registration = await navigator.serviceWorker.ready;
+
+            // 2. Check for existing subscription
+            let subscription = await registration.pushManager.getSubscription();
+
+            // 3. Subscribe only if not already subscribed
+            if (!subscription) {
+                subscription = await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
+                });
+            } else {
+                // Should we verify if the existing subscription key matches the new VAPID key?
+                // For now, assume it's valid to avoid churn.
+                // console.log('Using existing subscription');
+            }
+
+            // 4. Send subscription to server
+            await axios.post('/api/notifications/subscribe', { subscription });
+            // console.log('Push subscription verified');
+        } catch (err) {
+            console.error('Push subscription failed:', err);
+            // Optional: Show toast only if it was an explicit user action (requestPermission)
+        }
+    };
+
     return (
-        <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead, showToast, fetchNotifications }}>
+        <NotificationContext.Provider value={{
+            notifications, unreadCount, markAsRead, markAllAsRead,
+            showToast, fetchNotifications, requestPermission, permissionStatus,
+            pushLoading
+        }}>
             {children}
-            <AnimatePresence>
-                {toast && <Toast toast={toast} onClose={() => setToast(null)} />}
-            </AnimatePresence>
+            {toast && <Toast toast={toast} onClose={() => setToast(null)} />}
         </NotificationContext.Provider>
     );
 };
 
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding)
+        .replace(/-/g, '+')
+        .replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
+
 export const useNotification = () => useContext(NotificationContext);
+
+export const usePushNotifications = () => {
+    const { permissionStatus, requestPermission, pushLoading } = useContext(NotificationContext);
+    return {
+        permission: permissionStatus,
+        subscribe: requestPermission,
+        loading: pushLoading,
+        isSubscribed: permissionStatus === 'granted'
+    };
+};

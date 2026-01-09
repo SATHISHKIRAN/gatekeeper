@@ -1,16 +1,58 @@
 const db = require('../config/database');
-const { sendNotification } = require('./notificationController');
+const { sendNotification, createNotification } = require('./notificationController');
 const { generateSecureOriginal, encryptQRProxy } = require('../utils/cryptoUtils');
+
+
+exports.getProfile = async (req, res) => {
+    try {
+        const wardenId = req.user.id;
+        const [users] = await db.query(`
+            SELECT u.id, u.name, u.email, u.phone, u.role, u.profile_image, h.name as hostel_name 
+            FROM users u 
+            LEFT JOIN hostels h ON u.hostel_id = h.id 
+            WHERE u.id = ?`,
+            [wardenId]
+        );
+
+        if (users.length === 0) return res.status(404).json({ message: 'Warden not found' });
+        const user = users[0];
+
+        // Hostel stats
+        const [[{ occupancy }]] = await db.query(`
+            SELECT COUNT(*) as occupancy 
+            FROM users u 
+            JOIN hostels h ON u.hostel_id = h.id 
+            WHERE h.warden_id = ? AND u.role = 'student'`, [wardenId]);
+
+        res.json({
+            user,
+            stats: {
+                hostel_name: user.hostel_name || 'Not Assigned',
+                occupancy
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error fetching profile' });
+    }
+};
 
 exports.getVerificationQueue = async (req, res) => {
     const wardenId = req.user.id;
     try {
         const [requests] = await db.query(
-            `SELECT r.*, u.name as student_name, u.trust_score, u.email
+            `SELECT r.*, u.name as student_name, u.trust_score, u.email, u.phone, u.parent_phone, u.register_number, u.year, u.profile_image,
+                    rm.room_number, d.name as department_name, h.name as hostel_name,
+                   (SELECT COUNT(*) FROM logs l 
+                    JOIN requests r2 ON l.request_id = r2.id 
+                    WHERE r2.user_id = u.id AND l.action = 'entry' 
+                    AND l.timestamp > r2.return_date) as late_return_count
              FROM requests r 
              JOIN users u ON r.user_id = u.id 
              JOIN hostels h ON u.hostel_id = h.id
-             WHERE r.status IN ('approved_hod', 'approved_staff', 'emergency') 
+             LEFT JOIN rooms rm ON u.room_id = rm.id
+             LEFT JOIN departments d ON u.department_id = d.id
+             WHERE r.status = 'approved_hod' 
              AND h.warden_id = ?
              ORDER BY r.created_at ASC`,
             [wardenId]
@@ -50,7 +92,7 @@ exports.getDashboardStats = async (req, res) => {
              FROM requests r
              JOIN users u ON r.user_id = u.id
              JOIN hostels h ON u.hostel_id = h.id
-             WHERE r.status IN ('approved_hod', 'approved_staff', 'emergency') 
+             WHERE r.status = 'approved_hod' 
              AND h.warden_id = ?`,
             [wardenId]
         );
@@ -111,7 +153,7 @@ exports.getStudents = async (req, res) => {
     try {
         // Fetch students assigned to this warden's hostel block (via users.hostel_id)
         const [students] = await db.query(`
-            SELECT u.id, u.name, u.email, u.phone, u.department_id, u.register_number, u.year, u.room_id,
+            SELECT u.id, u.name, u.email, u.phone, u.department_id, u.register_number, u.year, u.room_id, u.profile_image,
                    d.name as department_name, h.name as hostel_name, r.room_number
             FROM users u
             JOIN hostels h ON u.hostel_id = h.id
@@ -131,12 +173,12 @@ exports.getUnassignedStudents = async (req, res) => {
     try {
         // Fetch unassigned hostel students (student_type = 'Hostel' AND hostel_id IS NULL)
         const [students] = await db.query(`
-            SELECT u.id, u.name, u.email, u.phone, u.register_number, u.year, d.name as department_name
+            SELECT u.id, u.name, u.email, u.phone, u.register_number, u.year, u.profile_image, d.name as department_name
             FROM users u
             LEFT JOIN departments d ON u.department_id = d.id
-            WHERE u.role = 'student' 
-            AND u.student_type = 'Hostel' 
-            AND u.hostel_id IS NULL
+            WHERE role = 'student' 
+            AND LOWER(student_type) = 'hostel' 
+            AND hostel_id IS NULL
             ORDER BY u.year DESC, u.register_number ASC
         `);
         res.json(students);
@@ -151,7 +193,7 @@ exports.getUnassignedBlockStudents = async (req, res) => {
     try {
         // Fetch students assigned to this warden's hostel but NOT in a room
         const [students] = await db.query(`
-            SELECT u.id, u.name, u.email, u.phone, u.register_number, u.year, d.name as department_name
+            SELECT u.id, u.name, u.email, u.phone, u.register_number, u.year, u.profile_image, d.name as department_name
             FROM users u
             JOIN hostels h ON u.hostel_id = h.id
             LEFT JOIN departments d ON u.department_id = d.id
@@ -233,7 +275,7 @@ exports.broadcast = async (req, res) => {
             for (const student of students) {
                 await sendNotification(
                     { userId: student.id },
-                    { title, message, type: 'info', category: 'broadcast' }
+                    { title, message, type: 'info', category: 'request' }
                 );
             }
         }
@@ -247,16 +289,16 @@ exports.broadcast = async (req, res) => {
 
 exports.verifyRequest = async (req, res) => {
     const { id } = req.params;
-    const { status, actionType } = req.body; // actionType: 'approve', 'reject', 'call_parent'
+    const { status, actionType, reason } = req.body;
+    console.log(`[VERIFY] Start ID: ${id} Status: ${status}`);
 
     try {
-        const [request] = await db.query('SELECT user_id, requires_qr FROM requests WHERE id = ?', [id]);
+        const [request] = await db.query('SELECT user_id FROM requests WHERE id = ?', [id]);
         if (request.length === 0) return res.status(404).json({ message: 'Request not found' });
 
         const studentId = request[0].user_id;
-        const requires_qr = request[0].requires_qr;
+        console.log(`[VERIFY] Found Request. Student ID: ${studentId}`);
 
-        // Check Trust Score if approving
         if (status === 'approved_warden') {
             const [[user]] = await db.query('SELECT trust_score FROM users WHERE id = ?', [studentId]);
             if (user && user.trust_score < 50) {
@@ -264,43 +306,61 @@ exports.verifyRequest = async (req, res) => {
             }
         }
 
+        console.log('[VERIFY] Updating DB...');
         await db.query('UPDATE requests SET status = ? WHERE id = ?', [status, id]);
 
-        if (status === 'approved_warden') {
-            if (requires_qr) {
-                const verifyCode = generateSecureOriginal();
-                const payload = {
-                    id: id,
-                    uid: studentId,
-                    code: verifyCode,
-                    ts: Date.now() // Timestamp for extra validation if needed
-                };
-                const qrHash = encryptQRProxy(payload);
+        // Log Action
+        const actionDetails = status === 'rejected' ? { reason: reason || 'No reason provided' } : { verified: true };
 
-                // Update with secure hash AND the visible 5-digit code
-                await db.query('UPDATE requests SET qr_code_hash = ?, verify_code = ? WHERE id = ?', [qrHash, verifyCode, id]);
+        await db.query(
+            'INSERT INTO staff_actions (staff_id, request_id, action_type, details) VALUES (?, ?, ?, ?)',
+            [req.user.id, id, status === 'approved_warden' ? 'approve_warden' : 'reject_warden', JSON.stringify(actionDetails)]
+        );
 
-                // Advanced WhatsApp Notification with Link to Wallet
-                await sendNotification(
-                    { userId: studentId },
-                    {
-                        title: 'Gate Pass READY! 🎟️',
-                        message: `Your gate pass is approved. Code: ${verifyCode}.\nQR is in your Wallet.`,
-                        type: 'success',
-                        link: '/wallet'
-                    }
-                );
-            } else {
-                await sendNotification({ userId: studentId }, { title: 'Leave Approved 🏠', message: 'Your hostel leave has been officially approved. Please stay within the hostel premises.', type: 'success' });
+        console.log('[VERIFY] DB Updated and Logged.');
+
+        // Background Notifications (Fire & Forget)
+        const sendBackgroundNotifications = async () => {
+            try {
+                if (status === 'approved_warden') {
+                    console.log('[BG] Sending Notif (Approved)...');
+                    await createNotification(studentId, 'Gate Pass Ready! 🎟️', 'Your gate pass is approved and ready. Verified by Register Number at the gate.', 'success', null, 'request');
+
+                    // Notify Gatekeeper
+                    const { sendNotification } = require('./notificationController');
+                    await sendNotification(
+                        { role: 'gatekeeper' },
+                        {
+                            title: 'New Pass Approved',
+                            message: 'A new pass has been approved by Warden and is ready for exit.',
+                            type: 'info',
+                            category: 'request',
+                            link: '/gate/dashboard'
+                        }
+                    );
+
+                } else if (status === 'rejected') {
+                    console.log('[BG] Sending Notif (Rejected)...');
+                    const rejectMsg = reason ? `Reason: ${reason}` : 'Your gate pass request was rejected by the Chief Warden.';
+                    await createNotification(studentId, 'Request Rejected by Warden', rejectMsg, 'error', null, 'request');
+                }
+                console.log('[BG] Notifications Processed.');
+            } catch (error) {
+                console.error('[BG] Notification Failed:', error);
             }
-        } else if (status === 'rejected') {
-            await sendNotification({ userId: studentId }, { title: 'Request Rejected by Warden', message: 'Your gate pass request was rejected by the Chief Warden.', type: 'error' });
-        }
+        };
 
-        res.json({ message: `Request ${status}` });
+        sendBackgroundNotifications();
+
+        res.json({ message: `Request ${status === 'rejected' ? 'rejected' : 'approved'}` });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        console.error('[VERIFY] CAUGHT ERROR:', error);
+        try {
+            require('fs').appendFileSync('warden_error_trace.log', `${new Date().toISOString()} - ${error.stack}\n`);
+        } catch (e) {
+            console.error('[VERIFY] Log Write Failed:', e);
+        }
+        res.status(500).json({ message: 'Server error: ' + error.message });
     }
 };
 
@@ -409,25 +469,56 @@ exports.getStudentProfile = async (req, res) => {
     const { id } = req.params;
     try {
         const [[student]] = await db.query(`
-            SELECT u.*, d.name as department_name, h.name as hostel_name, r.room_number
+            SELECT u.*, d.name as department_name, h.name as hostel_name, r.room_number,
+                   m.name as mentor_name
             FROM users u
             LEFT JOIN departments d ON u.department_id = d.id
             LEFT JOIN hostels h ON u.hostel_id = h.id
             LEFT JOIN rooms r ON u.room_id = r.id
+            LEFT JOIN users m ON u.mentor_id = m.id
             WHERE u.id = ? AND u.role = 'student'
         `, [id]);
 
         if (!student) return res.status(404).json({ message: 'Student not found' });
 
-        const [history] = await db.query(`
-            SELECT r.id, r.type, r.reason, r.status, r.created_at, r.updated_at
+        const [requests] = await db.query(`
+            SELECT r.*, 
+                   lexit.timestamp as actual_exit,
+                   lentry.timestamp as actual_entry
             FROM requests r
+            LEFT JOIN logs lexit ON r.id = lexit.request_id AND lexit.action = 'exit'
+            LEFT JOIN logs lentry ON r.id = lentry.request_id AND lentry.action = 'entry'
             WHERE r.user_id = ?
             ORDER BY r.created_at DESC
-            LIMIT 10
         `, [id]);
 
-        res.json({ student, history });
+        // Calculate advanced behavioral stats
+        const behaviorStats = {
+            total: requests.length,
+            approved: requests.filter(r => ['generated', 'completed', 'approved_warden'].includes(r.status)).length,
+            rejected: requests.filter(r => r.status === 'rejected').length,
+            pending: requests.filter(r => r.status === 'pending').length,
+            lateEntries: requests.filter(r => r.actual_entry && new Date(r.actual_entry) > new Date(r.return_date)).length,
+            lateExits: requests.filter(r => r.actual_exit && new Date(r.actual_exit) > new Date(r.departure_date)).length,
+            onTimeReturns: requests.filter(r => r.actual_entry && new Date(r.actual_entry) <= new Date(r.return_date)).length
+        };
+
+        // Get activity highlights (last 5 actions)
+        const activityHighlights = requests.slice(0, 5).map(r => ({
+            id: r.id,
+            type: r.type,
+            status: r.status,
+            isLateEntry: r.actual_entry && new Date(r.actual_entry) > new Date(r.return_date),
+            isLateExit: r.actual_exit && new Date(r.actual_exit) > new Date(r.departure_date),
+            date: r.created_at
+        }));
+
+        res.json({
+            student,
+            history: requests, // Renamed to match frontend expectation
+            stats: behaviorStats,
+            activity: activityHighlights
+        });
     } catch (error) {
         console.error("Student Profile Error:", error);
         res.status(500).json({ message: 'Server error fetching student profile' });
@@ -579,5 +670,60 @@ exports.vacateRoom = async (req, res) => {
     } catch (error) {
         console.error("Vacate Room Error Detailed:", error);
         res.status(500).json({ message: 'Server error vacating room: ' + error.message });
+    }
+};
+
+exports.getReports = async (req, res) => {
+    try {
+        const wardenId = req.user.id;
+        const { startDate, endDate, status, year, studentType } = req.query;
+
+        // Base Query
+        let query = `
+            SELECT 
+                r.id, r.type, r.reason, r.status, r.created_at, r.departure_date, r.return_date,
+                u.name as student_name, u.register_number, u.year, u.student_type, u.phone as student_phone,
+                h.name as hostel_name, room.room_number,
+                m.name as mentor_name
+            FROM requests r
+            JOIN users u ON r.user_id = u.id
+            LEFT JOIN users m ON u.mentor_id = m.id
+            LEFT JOIN hostels h ON u.hostel_id = h.id
+            LEFT JOIN rooms room ON u.room_id = room.id
+            WHERE u.hostel_id IN (SELECT id FROM hostels WHERE warden_id = ?)
+        `;
+
+        const params = [wardenId];
+
+        if (startDate && endDate) {
+            query += ` AND r.created_at BETWEEN ? AND ?`;
+            params.push(`${startDate} 00:00:00`, `${endDate} 23:59:59`);
+        }
+
+        if (status) {
+            const statusArray = status.split(',');
+            query += ` AND r.status IN (?)`;
+            params.push(statusArray);
+        }
+
+        if (year) {
+            const yearArray = year.split(',');
+            query += ` AND u.year IN (?)`;
+            params.push(yearArray);
+        }
+
+        if (studentType) {
+            query += ` AND u.student_type = ?`;
+            params.push(studentType);
+        }
+
+        query += ` ORDER BY r.created_at DESC`;
+
+        const [results] = await db.query(query, params);
+
+        res.json(results);
+    } catch (error) {
+        console.error('Warden Reports Error:', error);
+        res.status(500).json({ message: 'Failed to generate report' });
     }
 };

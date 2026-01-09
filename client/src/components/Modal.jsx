@@ -16,24 +16,18 @@ const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-md', showPa
     }, [isOpen]);
 
     return (
-        <AnimatePresence>
+        <>
             {isOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 md:p-8 overflow-y-auto">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 md:p-8 overflow-y-auto">
                     {/* Backdrop */}
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
+                    <div
                         onClick={onClose}
                         className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity"
                     />
 
                     {/* Modal Content */}
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                        className={`relative w-full ${maxWidth} bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-gray-100 dark:border-slate-800 flex flex-col max-h-[90vh]`}
+                    <div
+                        className={`relative w-full ${maxWidth} bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-gray-100 dark:border-slate-800 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200`}
                     >
                         {/* Header */}
                         {title && (
@@ -51,7 +45,7 @@ const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-md', showPa
                         {!title && (
                             <button
                                 onClick={onClose}
-                                className="absolute top-4 right-4 p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-all z-20"
+                                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all z-20"
                             >
                                 <X className="w-5 h-5" />
                             </button>
@@ -61,10 +55,10 @@ const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-md', showPa
                         <div className={`flex-1 overflow-y-auto custom-scrollbar ${showPadding ? 'p-6' : ''}`}>
                             {children}
                         </div>
-                    </motion.div>
+                    </div>
                 </div>
             )}
-        </AnimatePresence>
+        </>
     );
 };
 

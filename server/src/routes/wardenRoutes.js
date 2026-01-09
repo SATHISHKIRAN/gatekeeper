@@ -7,6 +7,7 @@ router.use(verifyToken);
 // 'warden' role access
 // 'warden' role access
 router.get('/verify-queue', authorizeRoles('warden'), wardenController.getVerificationQueue);
+router.get('/profile', verifyToken, authorizeRoles('warden'), wardenController.getProfile);
 router.get('/stats', authorizeRoles('warden'), wardenController.getDashboardStats);
 router.get('/students', authorizeRoles('warden'), wardenController.getStudents);
 router.get('/students/:id', authorizeRoles('warden'), wardenController.getStudentProfile);
@@ -28,5 +29,8 @@ router.put('/rooms/:id', authorizeRoles('warden'), wardenController.updateRoom);
 router.delete('/rooms/:id', authorizeRoles('warden'), wardenController.deleteRoom);
 router.post('/rooms/assign', authorizeRoles('warden'), wardenController.assignRoom);
 router.post('/rooms/vacate', authorizeRoles('warden'), wardenController.vacateRoom);
+
+// Reports
+router.get('/reports', authorizeRoles('warden'), wardenController.getReports);
 
 module.exports = router;

@@ -89,7 +89,7 @@ const ForgotPassword = () => {
         try {
             await axios.post('/api/auth/forgot-password/reset', { email, otp, newPassword });
             setStep(5);
-            setTimeout(() => navigate('/'), 3000);
+            setTimeout(() => navigate('/'), 1000);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to reset password');
         } finally {

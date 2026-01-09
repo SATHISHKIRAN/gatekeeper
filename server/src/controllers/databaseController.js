@@ -91,8 +91,8 @@ exports.resetDatabase = async (req, res) => {
             await connection.query('TRUNCATE TABLE notifications');
             await connection.query('TRUNCATE TABLE trust_history');
             await connection.query('TRUNCATE TABLE maintenance_requests');
-            // Reset Trust Scores
-            await connection.query('UPDATE users SET trust_score = 100 WHERE role = "student"');
+            // Reset Trust Scores (Excluding those with 0 who need manual intervention)
+            await connection.query('UPDATE users SET trust_score = 100 WHERE role = "student" AND trust_score > 0');
             // Reset Pass Blocked status
             await connection.query('UPDATE users SET pass_blocked = 0 WHERE role = "student"');
             await connection.query('SET FOREIGN_KEY_CHECKS = 1');
@@ -124,5 +124,118 @@ exports.resetDatabase = async (req, res) => {
         res.status(500).json({ message: 'Database reset failed' });
     } finally {
         connection.release();
+    }
+};
+
+exports.getDatabaseStats = async (req, res) => {
+    try {
+        // More reliable way to get tables in current database
+        const [tables] = await db.query('SHOW TABLES');
+        const dbName = process.env.DB_NAME || 'universe_gatekeeper';
+
+        const stats = [];
+        for (const tableRow of tables) {
+            const tableName = Object.values(tableRow)[0];
+
+            // Get count and size for each table
+            const [[{ count }]] = await db.query(`SELECT COUNT(*) as count FROM ??`, [tableName]);
+            const [[sizeRow]] = await db.query(`
+                SELECT (DATA_LENGTH + INDEX_LENGTH) as size 
+                FROM information_schema.TABLES 
+                WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
+            `, [dbName, tableName]);
+
+            stats.push({
+                name: tableName,
+                rows: count,
+                size: sizeRow ? sizeRow.size : 0
+            });
+        }
+
+        res.json(stats);
+    } catch (error) {
+        console.error('Stats Error:', error);
+        res.status(500).json({ message: 'Failed to fetch database stats' });
+    }
+};
+
+exports.clearTable = async (req, res) => {
+    const { tableName, confirmation } = req.body;
+
+    if (confirmation !== 'CONFIRM') {
+        return res.status(400).json({ message: 'Invalid confirmation' });
+    }
+
+    const whiteList = ['logs', 'notifications', 'trust_history', 'requests', 'maintenance_requests', 'ai_predictions', 'push_subscriptions', 'staff_actions', 'staff_leaves'];
+
+    if (!whiteList.includes(tableName)) {
+        return res.status(403).json({ message: 'This table cannot be cleared individually for safety reasons.' });
+    }
+
+    try {
+        await db.query('SET FOREIGN_KEY_CHECKS = 0');
+        await db.query(`TRUNCATE TABLE ??`, [tableName]);
+        await db.query('SET FOREIGN_KEY_CHECKS = 1');
+        res.json({ message: `Table ${tableName} cleared successfully.` });
+    } catch (error) {
+        console.error(error);
+        await db.query('SET FOREIGN_KEY_CHECKS = 1');
+        res.status(500).json({ message: 'Failed to clear table' });
+    }
+};
+
+exports.getTableData = async (req, res) => {
+    try {
+        const { tableName } = req.params;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const offset = (page - 1) * limit;
+
+        // Security check for table name
+        const [tables] = await db.query('SHOW TABLES');
+        const validTables = tables.map(t => Object.values(t)[0]);
+        if (!validTables.includes(tableName)) {
+            return res.status(403).json({ message: 'Invalid table name' });
+        }
+
+        // Fetch data
+        const [rows] = await db.query(`SELECT * FROM ?? ORDER BY id DESC LIMIT ? OFFSET ?`, [tableName, limit, offset]);
+        const [[{ total }]] = await db.query(`SELECT COUNT(*) as total FROM ??`, [tableName]);
+
+        res.json({
+            data: rows,
+            pagination: {
+                current: page,
+                limit,
+                total,
+                pages: Math.ceil(total / limit)
+            }
+        });
+    } catch (error) {
+        console.error('Fetch Table Data Error:', error);
+        res.status(500).json({ message: 'Failed to fetch table data' });
+    }
+};
+
+exports.deleteTableRow = async (req, res) => {
+    try {
+        const { tableName, id } = req.params;
+
+        // Security check
+        const [tables] = await db.query('SHOW TABLES');
+        const validTables = tables.map(t => Object.values(t)[0]);
+        if (!validTables.includes(tableName)) {
+            return res.status(403).json({ message: 'Invalid table name' });
+        }
+
+        if (tableName === 'users' && id === '1') {
+            return res.status(403).json({ message: 'Cannot delete the Super Admin user.' });
+        }
+
+        await db.query(`DELETE FROM ?? WHERE id = ?`, [tableName, id]);
+        res.json({ message: 'Row deleted successfully' });
+    } catch (error) {
+        console.error('Delete Row Error:', error);
+        res.status(500).json({ message: 'Failed to delete row' });
     }
 };

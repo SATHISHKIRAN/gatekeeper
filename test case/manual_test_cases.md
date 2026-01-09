@@ -1,0 +1,86 @@
+# manual_test_cases.md
+
+# UniVerse GateKeeper - Manual Test Cases
+
+This document contains a comprehensive set of manual test cases for the Universe GateKeeper system, including detailed HOD workflows.
+
+## 1. Authentication & Authorization
+
+| TC ID | Test Scenario | Actor | Pre-Conditions | Steps | Expected Result |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **AUTH-01** | Student Login | Student | Registered User | 1. Enter email/password.<br>2. Click Login. | Redirect to Student Dashboard. |
+| **AUTH-02** | Staff Login | Staff | Valid credentials | 1. Enter email/password.<br>2. Click Login. | Redirect to Staff Dashboard. |
+| **AUTH-03** | Gatekeeper Login | Gatekeeper | Valid credentials | 1. Enter email/password.<br>2. Click Login. | Redirect to Gatekeeper Dashboard. |
+| **AUTH-04** | Invalid Login | Any | N/A | 1. Enter wrong password. | Error message "Invalid credentials". |
+| **AUTH-05** | Logout | Any | Logged in | 1. Click Logout. | Redirect to Login page; Session cleared. |
+
+## 2. Student Workflow (Pass Management)
+
+| TC ID | Test Scenario | Actor | Pre-Conditions | Steps | Expected Result |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **STU-01** | Apply for Outing Pass | Student | Logged in | 1. Click "New Pass".<br>2. Select "Outing".<br>3. Fill date/reason.<br>4. Submit. | Pass status = `pending`. Appears in "Active Requests". |
+| **STU-02** | Apply for Home Pass | Student | Logged in | 1. Click "New Pass".<br>2. Select "Home".<br>3. Fill date/reason.<br>4. Submit. | Pass status = `pending`. |
+| **STU-03** | Cancel Pending Pass | Student | Pass is `pending` | 1. View Pass details.<br>2. Click "Cancel". | Pass status -> `cancelled`. removed from active list? |
+| **STU-04** | View Pass History | Student | Has history | 1. Navigate to "History". | List of all past passes with correct statuses. |
+| **STU-05** | View Profile | Student | Logged in | 1. Click Profile. | Shows Name, Dept, Year, Mentor, Parent Info. |
+
+## 3. Approval Workflow (Staff/HOD/Warden)
+
+| TC ID | Test Scenario | Actor | Pre-Conditions | Steps | Expected Result |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **STF-01** | Staff Approve | Staff | Student assigned to Staff | 1. Go to "Pending Requests".<br>2. Click on a request.<br>3. Click "Approve". | Status -> `approved_staff`. Detailed logs updated. |
+| **STF-02** | Staff Reject | Staff | Pending Request | 1. Click "Reject".<br>2. Enter Reason. | Status -> `rejected`. Student notified. |
+| **HOD-01** | HOD Approve | HOD | Request `approved_staff` | 1. Go to Pending.<br>2. Approve. | Status -> `approved_hod` (or `approved_warden` if workflow differs). |
+| **WAR-01** | Warden Approve | Warden | Request `approved_hod` | 1. Go to Pending.<br>2. Approve. | Status -> `approved_warden` / `generated`. QR Code Created. |
+
+## 4. Gatekeeper Operations (Entry/Exit)
+
+| TC ID | Test Scenario | Actor | Pre-Conditions | Steps | Expected Result |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **GTK-01** | Scan Valid Exit Pass | Gatekeeper | Pass is `generated` | 1. Scan QR Code.<br>2. Click "Verify". | System shows "Allowed". Action -> "Check-out". Status -> `active`. |
+| **GTK-02** | Scan Valid Entry Pass | Gatekeeper | Pass is `active` | 1. Scan QR Code.<br>2. Click "Verify". | Action -> "Check-in". Status -> `completed`. |
+| **GTK-03** | Scan Expired Pass | Gatekeeper | Date passed | 1. Scan QR Code. | System shows "Expired" or "Access Denied". |
+| **GTK-04** | Manual Entry (No QR) | Gatekeeper | System Failure | 1. Enter Reg Num manualy.<br>2. Verify details.<br>3. Log action. | Manual log entry created. |
+
+## 5. Visitor Management
+
+| TC ID | Test Scenario | Actor | Pre-Conditions | Steps | Expected Result |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **VIS-01** | Issue Visitor Pass | Gatekeeper | New Visitor | 1. Click "New Visitor".<br>2. Enter Name, Phone, Purpose.<br>3. Submit. | Visitor Pass created. Status `active`. |
+| **VIS-02** | Visitor Checkout | Gatekeeper | Visitor `active` | 1. Find Visitor.<br>2. Click "Checkout". | Status -> `completed`. Checkout time recorded. |
+| **VIS-03** | Create Contract Worker | Gatekeeper | New Worker | 1. Visitor Type = "Contract".<br>2. Fill details. | Permanent/Long-term pass created. |
+| **VIS-04** | Toggle Contract Worker| Gatekeeper | Worker exists | 1. Scan/Select Worker.<br>2. Toggle Entry/Exit. | Log entry created. Status toggles. |
+
+## 6. Admin & Settings
+
+| TC ID | Test Scenario | Actor | Pre-Conditions | Steps | Expected Result |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **ADM-01** | Create User | Admin | Logged in | 1. Users -> Add User.<br>2. Fill details/Role.<br>3. Submit. | New user can login. |
+| **ADM-02** | View Logs | Admin | Activity exists | 1. Go to Logs. | Shows list of Gate/Auth logs. |
+| **ADM-03** | Change Setting | Admin | Logged in | 1. Settings -> Toggle Maint Mode. | System restricts non-admin access. |
+
+## 7. Edge Cases & Validation
+
+| TC ID | Test Scenario | Pre-Conditions | Expected Result |
+| :--- | :--- | :--- | :--- |
+| **EC-01** | Duplicate Request | Student has pending pass | System should block new request or warn. |
+| **EC-02** | Double Entry | Student already inside | Scanner shows "Already Inside" error. |
+| **EC-03** | Double Exit | Student already outside | Scanner shows "Already Outside" error. |
+| **EC-04** | Future Date Pass | Pass valid for tomorrow | Scanning today -> "Not yet valid". |
+
+## 8. HOD Specific Functionality
+
+| TC ID | Test Scenario | Actor | Pre-Conditions | Steps | Expected Result |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **HOD-02** | **Bulk Approve** | HOD | Multiple pending requests | 1. Select multiple requests.<br>2. Click "Bulk Approve". | All selected requests change to `approved_hod`. |
+| **HOD-03** | **Medical Override** | HOD | Medical emergency | 1. Navigate to "Medical Override".<br>2. Enter Student ID & Reason.<br>3. Submit. | Immediate Pass generated/approved ignoring standard blocks. |
+| **HOD-04** | **Set Proxy** | HOD | Need a proxy | 1. Settings -> Set Proxy.<br>2. Select Staff/User.<br>3. Set Duration. | Proxy user gains HOD privileges for duration. notification sent. |
+| **HOD-05** | **Revoke Proxy** | HOD | Proxy active | 1. Settings -> Revoke Proxy. | Proxy user loses HOD privileges immediately. |
+| **HOD-06** | **Assign Mentor** | HOD | Unassigned Students exist | 1. "Mentorship" -> Select Unassigned.<br>2. Choose Staff Member.<br>3. Assign. | Students mapped to Staff. Staff sees them in "My Students". |
+| **HOD-07** | **Unassign Mentor** | HOD | Students assigned | 1. Select Students.<br>2. Click Unassign. | Students move to "Unassigned" pool. |
+| **HOD-08** | **Toggle Block (Student)**| HOD | Student list | 1. Find Student.<br>2. Toggle "Block Pass". | Student cannot apply for passes. Status updated. |
+| **HOD-09** | **Reset Cooldown** | HOD | Student on cooldown | 1. Student Profile -> "Reset Cooldown". | Cooldown removed. Student can apply immediately. |
+| **HOD-10** | **Update Trust Score** | HOD | Student Profile | 1. Adjust Score Slider/Input.<br>2. Submit. | Trust score updated in DB. History logged. |
+| **HOD-11** | **Year Restriction** | HOD | Dashboard/Settings | 1. Select Year (e.g., 1st Year).<br>2. Toggle "Restrict". | All 1st Year students blocked from applying. |
+| **HOD-12** | **Staff Leave** | HOD | Staff available | 1. Staff Management -> Add Leave.<br>2. Select Staff & Dates. | Staff marked on leave. Mentees may be re-routed or auto-handled. |
+

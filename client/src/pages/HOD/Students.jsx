@@ -14,7 +14,21 @@ const HODStudents = () => {
     const [students, setStudents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [filter, setFilter] = useState('all'); // all, blocked, authorized
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 20;
+
+    const getYearLabel = (year) => {
+        const strYear = String(year).trim().toUpperCase();
+        if (!year || year === 0 || strYear === '0' || strYear === 'N/A' || strYear === 'UNKNOWN') {
+            return '';
+        }
+
+        const num = parseInt(strYear);
+        if (isNaN(num)) return strYear;
+
+        return `${num}yr`;
+    };
 
     const [profilerData, setProfilerData] = useState(null);
     const [isProfilerLoading, setIsProfilerLoading] = useState(false);
@@ -48,15 +62,46 @@ const HODStudents = () => {
         }
     };
 
+    const [filters, setFilters] = useState({
+        status: 'all',
+        year: 'all',
+        type: 'all',
+        trust: 'all'
+    });
+
     const filteredStudents = students.filter(s => {
         const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             s.register_number.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesFilter = filter === 'all'
-            ? true
-            : filter === 'blocked' ? s.pass_blocked
-                : !s.pass_blocked;
-        return matchesSearch && matchesFilter;
+
+        const matchesStatus = filters.status === 'all' ? true :
+            filters.status === 'blocked' ? s.pass_blocked :
+                !s.pass_blocked;
+
+        const matchesYear = filters.year === 'all' ? true :
+            String(s.year) === filters.year;
+
+        const matchesType = filters.type === 'all' ? true :
+            (s.student_type || 'N/A') === filters.type;
+
+        const matchesTrust = filters.trust === 'all' ? true :
+            filters.trust === 'high' ? s.trust_score >= 80 :
+                filters.trust === 'low' ? s.trust_score < 50 :
+                    true;
+
+        return matchesSearch && matchesStatus && matchesYear && matchesType && matchesTrust;
     });
+
+    // Pagination Logic
+
+    // Reset page on search/filter
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filters]);
+
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentItems = filteredStudents.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
 
     const getTrustColor = (score) => {
         if (score >= 80) return 'text-emerald-600 bg-emerald-50 border-emerald-100';
@@ -72,34 +117,64 @@ const HODStudents = () => {
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Student Roster</h1>
                     <p className="text-slate-500 text-sm mt-1">Manage departmental students and view detailed mobility analytics.</p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input
-                            type="text"
-                            placeholder="Search students..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full md:w-64"
-                        />
-                    </div>
-                </div>
             </div>
 
-            {/* Quick Stats/Filters (Optional - can be tabs) */}
-            <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700 pb-1">
-                {['all', 'authorized', 'blocked'].map((f) => (
-                    <button
-                        key={f}
-                        onClick={() => setFilter(f)}
-                        className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors capitalize ${filter === f
-                            ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/10'
-                            : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                            }`}
+            {/* Advanced Search & Filter Bar */}
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4 md:space-y-0 md:flex items-center gap-4">
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                        type="text"
+                        placeholder="Search by name or register number..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full transition-all"
+                    />
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                    <select
+                        value={filters.status}
+                        onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                        className="px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                     >
-                        {f}
-                    </button>
-                ))}
+                        <option value="all">Check Status</option>
+                        <option value="active">Active</option>
+                        <option value="blocked">Blocked</option>
+                    </select>
+
+                    <select
+                        value={filters.year}
+                        onChange={(e) => setFilters(prev => ({ ...prev, year: e.target.value }))}
+                        className="px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    >
+                        <option value="all">All Years</option>
+                        <option value="1">1st Year</option>
+                        <option value="2">2nd Year</option>
+                        <option value="3">3rd Year</option>
+                        <option value="4">4th Year</option>
+                    </select>
+
+                    <select
+                        value={filters.type}
+                        onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
+                        className="px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    >
+                        <option value="all">All Types</option>
+                        <option value="Day Scholar">Day Scholar</option>
+                        <option value="Hostel">Hosteller</option>
+                    </select>
+
+                    <select
+                        value={filters.trust}
+                        onChange={(e) => setFilters(prev => ({ ...prev, trust: e.target.value }))}
+                        className="px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    >
+                        <option value="all">Trust Score</option>
+                        <option value="high">High Trust (80%+)</option>
+                        <option value="low">Low Trust (&lt;50%)</option>
+                    </select>
+                </div>
             </div>
 
             {/* Clean Table */}
@@ -108,8 +183,9 @@ const HODStudents = () => {
                     <table className="w-full text-left text-sm">
                         <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 border-b border-slate-200 dark:border-slate-700 font-medium">
                             <tr>
-                                <th className="px-6 py-4">Student Name</th>
+                                <th className="px-6 py-4">Student Information</th>
                                 <th className="px-6 py-4">Register No.</th>
+                                <th className="px-6 py-4">Academic Details</th>
                                 <th className="px-6 py-4">Trust Score</th>
                                 <th className="px-6 py-4">Status</th>
                                 <th className="px-6 py-4 text-right">Actions</th>
@@ -129,33 +205,77 @@ const HODStudents = () => {
                                     </td>
                                 </tr>
                             ) : (
-                                filteredStudents.map((student) => (
+                                currentItems.map((student) => (
                                     <tr
                                         key={student.id}
                                         className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors group cursor-pointer"
                                         onClick={() => fetchProfiler(student.id)}
                                     >
-                                        <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
-                                            {student.name}
-                                            <div className="text-xs text-slate-400 font-normal mt-0.5">{student.email}</div>
-                                        </td>
-                                        <td className="px-6 py-4 text-slate-600 dark:text-slate-300 font-mono">
-                                            {student.register_number}
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-sm font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 overflow-hidden">
+                                                    {student.profile_image ? (
+                                                        <img
+                                                            src={`/img/student/${student.profile_image}`}
+                                                            alt={student.name}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        student.name.charAt(0)
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <div className="font-bold text-slate-900 dark:text-white">{student.name}</div>
+                                                    <div className="text-xs text-slate-400 font-medium mt-0.5">{student.email}</div>
+                                                </div>
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${getTrustColor(student.trust_score)}`}>
-                                                {student.trust_score}%
+                                            <span className="font-mono text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700">
+                                                {student.register_number}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
+                                            <div className="flex flex-col gap-1.5">
+                                                <span className={`inline-flex w-fit px-2.5 py-1 rounded-lg text-xs font-black border ${student.year === 1 ? 'bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-900/30' :
+                                                    student.year === 2 ? 'bg-violet-50 text-violet-600 border-violet-100 dark:bg-violet-900/20 dark:text-violet-400 dark:border-violet-900/30' :
+                                                        student.year === 3 ? 'bg-fuchsia-50 text-fuchsia-600 border-fuchsia-100 dark:bg-fuchsia-900/20 dark:text-fuchsia-400 dark:border-fuchsia-900/30' :
+                                                            student.year === 4 ? 'bg-rose-50 text-rose-600 border-rose-100 dark:bg-rose-900/20 dark:text-rose-400 dark:border-rose-900/30' :
+                                                                'bg-slate-50 text-slate-600 border-slate-100 dark:bg-slate-800 dark:text-slate-400'
+                                                    }`}>
+                                                    {getYearLabel(student.year)}
+                                                </span>
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-0.5">
+                                                    {student.student_type || 'N/A'}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="w-24">
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <span className={`text-xs font-black ${student.trust_score >= 80 ? 'text-emerald-500' :
+                                                        student.trust_score >= 50 ? 'text-indigo-500' : 'text-red-500'
+                                                        }`}>{student.trust_score}%</span>
+                                                </div>
+                                                <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                                    <div
+                                                        className={`h-full rounded-full ${student.trust_score >= 80 ? 'bg-emerald-500' :
+                                                            student.trust_score >= 50 ? 'bg-indigo-500' : 'bg-red-500'
+                                                            }`}
+                                                        style={{ width: `${student.trust_score}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
                                             {student.pass_blocked ? (
-                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                                                    <Shield className="w-3.5 h-3.5" />
+                                                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-600 border border-red-100 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/30">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                                                     Blocked
                                                 </span>
                                             ) : (
-                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                                                    <CheckCircle className="w-3.5 h-3.5" />
+                                                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-900/30">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                                                     Active
                                                 </span>
                                             )}
@@ -174,6 +294,31 @@ const HODStudents = () => {
                         </tbody>
                     </table>
                 </div>
+                {/* Pagination Controls */}
+                <div className="bg-slate-50 dark:bg-slate-700/30 border-t border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between">
+                    <p className="text-xs font-medium text-slate-500">
+                        Showing {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredStudents.length)} of {filteredStudents.length} students
+                    </p>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            disabled={currentPage === 1}
+                            className="px-3 py-1 text-xs font-bold uppercase tracking-wider bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                        >
+                            Previous
+                        </button>
+                        <span className="px-3 py-1 text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center">
+                            Page {currentPage} of {totalPages}
+                        </span>
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            disabled={currentPage === totalPages}
+                            className="px-3 py-1 text-xs font-bold uppercase tracking-wider bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                        >
+                            Next
+                        </button>
+                    </div>
+                </div>
             </div>
 
             {/* Advanced Student Profiler Modal */}
@@ -188,8 +333,16 @@ const HODStudents = () => {
                         {/* Profile Header */}
                         <div className="bg-white dark:bg-slate-900 p-8 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between">
                             <div className="flex items-center gap-6">
-                                <div className="w-20 h-20 rounded-2xl bg-indigo-600 text-white flex items-center justify-center text-3xl font-bold shadow-lg shadow-indigo-500/20">
-                                    {profilerData.student.name.charAt(0)}
+                                <div className="w-20 h-20 rounded-2xl bg-indigo-600 text-white flex items-center justify-center text-3xl font-bold shadow-lg shadow-indigo-500/20 overflow-hidden">
+                                    {profilerData.student.profile_image ? (
+                                        <img
+                                            src={`/img/student/${profilerData.student.profile_image}`}
+                                            alt={profilerData.student.name}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        profilerData.student.name.charAt(0)
+                                    )}
                                 </div>
                                 <div>
                                     <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">{profilerData.student.name}</h2>
@@ -198,7 +351,7 @@ const HODStudents = () => {
                                             {profilerData.student.register_number}
                                         </span>
                                         <span>•</span>
-                                        <span>Year {profilerData.student.year}</span>
+                                        <span>{getYearLabel(profilerData.student.year)}</span>
                                         <span>•</span>
                                         <span className="lowercase">{profilerData.student.email}</span>
                                     </div>
@@ -286,22 +439,40 @@ const HODStudents = () => {
                                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                                         <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">Current Status</h4>
                                         <div className="flex items-center gap-4 mb-2">
-                                            {profilerData.student.pass_blocked ? (
-                                                <div className="p-3 bg-red-50 text-red-600 rounded-lg">
-                                                    <Shield className="w-6 h-6" />
-                                                </div>
-                                            ) : (
-                                                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
-                                                    <CheckCircle className="w-6 h-6" />
-                                                </div>
-                                            )}
-                                            <div>
-                                                <p className="font-bold text-slate-900 dark:text-white">
-                                                    {profilerData.student.pass_blocked ? 'Gate Access Blocked' : 'Gate Access Active'}
-                                                </p>
-                                                <p className="text-sm text-slate-500">
-                                                    {profilerData.student.pass_blocked ? 'Student cannot exit campus.' : 'Student can apply for passes.'}
-                                                </p>
+                                            <div className="flex items-center gap-4 mb-2">
+                                                {profilerData.active_pass ? (
+                                                    <>
+                                                        <div className="p-3 bg-amber-50 text-amber-600 rounded-lg animate-pulse">
+                                                            <Activity className="w-6 h-6" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-bold text-slate-900 dark:text-white">Student Outside</p>
+                                                            <p className="text-sm text-slate-500">
+                                                                Pass Active • Departed {new Date(profilerData.active_pass.departure_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            </p>
+                                                        </div>
+                                                    </>
+                                                ) : profilerData.student.pass_blocked ? (
+                                                    <>
+                                                        <div className="p-3 bg-red-50 text-red-600 rounded-lg">
+                                                            <Shield className="w-6 h-6" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-bold text-slate-900 dark:text-white">Gate Access Blocked</p>
+                                                            <p className="text-sm text-slate-500">Student cannot exit campus.</p>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
+                                                            <CheckCircle className="w-6 h-6" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-bold text-slate-900 dark:text-white">Gate Access Active</p>
+                                                            <p className="text-sm text-slate-500">Student can apply for passes.</p>
+                                                        </div>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

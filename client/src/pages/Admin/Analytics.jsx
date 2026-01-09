@@ -106,8 +106,8 @@ const AdminAnalytics = () => {
                         </div>
                         <TrendingUp className="w-5 h-5 text-slate-400" />
                     </div>
-                    <div className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div className="h-80 w-full">
+                        <ResponsiveContainer width={500} height="100%" minWidth={10} minHeight={10} style={{ width: '99%' }}>
                             <AreaChart data={weekly_trends}>
                                 <defs>
                                     <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
@@ -150,8 +150,8 @@ const AdminAnalytics = () => {
                 {/* Department Stats */}
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-6">Department Activity</h3>
-                    <div className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div className="h-80 w-full">
+                        <ResponsiveContainer width={500} height="100%" minWidth={10} minHeight={10} style={{ width: '99%' }}>
                             <BarChart data={department_stats} layout="vertical">
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                                 <XAxis type="number" hide />
@@ -180,8 +180,8 @@ const AdminAnalytics = () => {
                         <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Hostel Occupancy</h3>
                         <Home className="w-5 h-5 text-slate-400" />
                     </div>
-                    <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div className="h-64 w-full">
+                        <ResponsiveContainer width={500} height="100%" minWidth={10} minHeight={10} style={{ width: '99%' }}>
                             <PieChart>
                                 <Pie
                                     data={[

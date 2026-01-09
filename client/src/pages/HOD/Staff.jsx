@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Search, User, Mail, Shield, Award,
     ArrowUpRight, Filter, Download, Briefcase,
-    ShieldCheck, Clock, UserMinus, X
+    ShieldCheck, Clock, UserMinus, X, Activity, Trash2
 } from 'lucide-react';
 import Modal from '../../components/Modal';
 
@@ -263,8 +263,8 @@ const HODStaff = () => {
                                         key={student.id}
                                         onClick={() => setSelectedStudents(prev => prev.includes(student.id) ? prev.filter(id => id !== student.id) : [...prev, student.id])}
                                         className={`p-3 rounded-lg border cursor-pointer flex justify-between items-center transition-all ${selectedStudents.includes(student.id)
-                                                ? 'bg-violet-50 border-violet-500 dark:bg-violet-900/20'
-                                                : 'bg-white border-gray-200 dark:bg-slate-800 dark:border-slate-700 hover:border-violet-300'
+                                            ? 'bg-violet-50 border-violet-500 dark:bg-violet-900/20'
+                                            : 'bg-white border-gray-200 dark:bg-slate-800 dark:border-slate-700 hover:border-violet-300'
                                             }`}
                                     >
                                         <div>
@@ -301,8 +301,8 @@ const HODStaff = () => {
                                             key={student.id}
                                             onClick={() => setSelectedMentees(prev => prev.includes(student.id) ? prev.filter(id => id !== student.id) : [...prev, student.id])}
                                             className={`p-3 rounded-lg border cursor-pointer flex justify-between items-center transition-all ${selectedMentees.includes(student.id)
-                                                    ? 'bg-red-50 border-red-500 dark:bg-red-900/20'
-                                                    : 'bg-white border-gray-200 dark:bg-slate-800 dark:border-slate-700 hover:border-red-300'
+                                                ? 'bg-red-50 border-red-500 dark:bg-red-900/20'
+                                                : 'bg-white border-gray-200 dark:bg-slate-800 dark:border-slate-700 hover:border-red-300'
                                                 }`}
                                         >
                                             <div>
@@ -333,34 +333,199 @@ const HODStaff = () => {
             >
                 {/* ... existing modal content ... */}
                 {profilerData && (
-                    <div className="flex flex-col">
-                        {/* Modal Header */}
-                        <div className="p-8 lg:p-10 bg-violet-600 text-white relative">
-                            {/* ... */}
-                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 relative z-10">
-                                <div className="flex items-center gap-6">
-                                    {/* ... */}
-                                    <div className="space-y-1">
-                                        <h2 className="text-3xl font-black tracking-tight">{profilerData.member.name}</h2>
-                                        <p className="text-violet-100 text-xs font-bold uppercase tracking-widest opacity-80">{profilerData.member.email}</p>
+                    <div className="flex flex-col h-[85vh] lg:h-auto bg-gray-50 dark:bg-slate-900 overflow-hidden">
+                        {/* 1. Header Section */}
+                        <div className="p-6 lg:p-8 bg-gradient-to-r from-violet-600 to-indigo-600 text-white shrink-0">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                                <div className="flex items-center gap-5">
+                                    <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white font-black text-2xl shadow-inner">
+                                        {profilerData.member.name.charAt(0)}
+                                    </div>
+                                    <div>
+                                        <h2 className="text-2xl md:text-3xl font-black tracking-tight">{profilerData.member.name}</h2>
+                                        <p className="text-violet-100 text-xs font-bold uppercase tracking-widest opacity-80 mt-1">{profilerData.member.email}</p>
+                                        <div className="mt-3 flex items-center gap-3">
+                                            <span className={`inline-flex items-center px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${profilerData.stats.active_duty === 'On Duty' ? 'bg-emerald-400/20 text-emerald-100' : 'bg-amber-400/20 text-amber-100'}`}>
+                                                {profilerData.stats.active_duty}
+                                            </span>
+                                            <span className="inline-flex items-center px-3 py-1 bg-white/10 rounded-lg text-[10px] font-black text-white uppercase tracking-wider">
+                                                ID: {profilerData.member.id}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="flex gap-4">
-                                    {/* Enhanced Stats in Modal if needed, skipping for brevity to match exact replacement block */}
+                                <div className="flex gap-3 shrink-0">
+                                    {profilerData.stats.active_duty === 'On Leave' ? (
+                                        <button
+                                            onClick={async () => {
+                                                const activeLeave = profilerData.leaves.find(l => l.status === 'approved' && new Date() >= new Date(l.start_date) && new Date() <= new Date(l.end_date));
+                                                if (activeLeave) {
+                                                    await handleAction(activeLeave.id, 'terminate');
+                                                }
+                                            }}
+                                            className="px-5 py-3 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-500/10 transition-all flex items-center gap-2"
+                                        >
+                                            <Briefcase className="w-4 h-4" /> Mark "On Duty"
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => {
+                                                setNewLeave(prev => ({ ...prev, staffId: profilerData.member.id }));
+                                                setShowLeaveModal(true);
+                                            }}
+                                            className="px-5 py-3 bg-white text-violet-600 hover:bg-violet-50 rounded-xl text-xs font-black uppercase tracking-wider shadow-lg shadow-black/10 transition-all flex items-center gap-2"
+                                        >
+                                            <Clock className="w-4 h-4" /> Grant Leave
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>
 
-                        {/* Body - Reusing existing body structure but ensuring it closes properly */}
-                        <div className="p-8 lg:p-10 space-y-10 bg-gray-50/50 dark:bg-slate-900/50">
-                            {/* ... leave registry ... */}
+                        {/* 2. Scrollable Body */}
+                        <div className="flex-1 overflow-y-auto">
+                            <div className="p-6 lg:p-8 space-y-8">
+
+                                {/* Stats Grid */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    {[
+                                        { label: 'Total Mentees', value: profilerData.stats.total_mentees, icon: User, color: 'blue' },
+                                        { label: 'Active Mentees', value: profilerData.stats.active_mentees, icon: ShieldCheck, color: 'emerald' },
+                                        { label: 'Leaves Taken', value: profilerData.stats.total_leaves, icon: Clock, color: 'amber' },
+                                        { label: 'Actions Logged', value: profilerData.stats.approvals_logged, icon: Activity, color: 'violet' }
+                                    ].map((stat, i) => (
+                                        <div key={i} className="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-all">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className={`p-2 rounded-lg bg-${stat.color}-50 dark:bg-${stat.color}-900/20 text-${stat.color}-600`}>
+                                                    <stat.icon className="w-4 h-4" />
+                                                </div>
+                                            </div>
+                                            <p className="text-2xl font-black text-gray-900 dark:text-white">{stat.value}</p>
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mt-1">{stat.label}</p>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                    {/* Mentees Roster */}
+                                    <div className="bg-white dark:bg-slate-800 rounded-3xl border border-gray-100 dark:border-slate-700 overflow-hidden shadow-sm">
+                                        <div className="p-6 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center">
+                                            <h3 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">Mentorship Roster</h3>
+                                            <span className="text-xs font-bold text-gray-400">{profilerData.mentees?.length || 0} Students</span>
+                                        </div>
+                                        <div className="max-h-[300px] overflow-y-auto p-4 space-y-3">
+                                            {profilerData.mentees?.length > 0 ? (
+                                                profilerData.mentees.map(student => (
+                                                    <div key={student.id} className="group p-4 rounded-2xl bg-gray-50 dark:bg-slate-900/50 hover:bg-indigo-50 dark:hover:bg-indigo-900/10 transition-colors border border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/30 flex items-center justify-between">
+                                                        <div>
+                                                            <p className="text-sm font-black text-gray-800 dark:text-slate-200">{student.name}</p>
+                                                            <p className="text-[10px] font-bold text-gray-400 uppercase">{student.year} Year • {student.student_type}</p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className="flex items-center justify-end gap-1 mb-1">
+                                                                <Shield className={`w-3 h-3 ${student.trust_score < 30 ? 'text-red-500' : 'text-emerald-500'}`} />
+                                                                <span className={`text-xs font-black ${student.trust_score < 30 ? 'text-red-600' : 'text-emerald-600'}`}>{student.trust_score}</span>
+                                                            </div>
+                                                            {student.pass_blocked && <span className="text-[10px] font-black text-red-500 bg-red-50 px-2 py-0.5 rounded-md uppercase">Blocked</span>}
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="text-center py-10 text-gray-400 text-xs font-bold uppercase tracking-wider">No active mentees</div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Action History */}
+                                    <div className="bg-white dark:bg-slate-800 rounded-3xl border border-gray-100 dark:border-slate-700 overflow-hidden shadow-sm flex flex-col">
+                                        <div className="p-6 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center">
+                                            <h3 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">Action History</h3>
+                                            <Activity className="w-5 h-5 text-gray-400" />
+                                        </div>
+                                        <div className="max-h-[300px] overflow-y-auto flex-1">
+                                            {profilerData.history?.length > 0 ? (
+                                                <div className="divide-y divide-gray-50 dark:divide-slate-700/50">
+                                                    {profilerData.history.map((log) => (
+                                                        <div key={log.id} className="p-4 flex gap-4 hover:bg-gray-50 dark:hover:bg-slate-700/10 transition-colors">
+                                                            <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${log.action_type === 'approve' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                                                            <div>
+                                                                <p className="text-xs font-bold text-gray-700 dark:text-slate-300">
+                                                                    {log.action_type === 'approve' ? 'Approved Request' : 'Rejected Request'}
+                                                                </p>
+                                                                {log.request_reason && <p className="text-[10px] text-gray-400 mt-0.5 line-clamp-1">"{log.request_reason}"</p>}
+                                                                <p className="text-[10px] font-mono text-gray-400 mt-1">{new Date(log.timestamp).toLocaleString()}</p>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="text-center py-10 text-gray-400 text-xs font-bold uppercase tracking-wider">No recent actions</div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Leave History (New) */}
+                                    <div className="bg-white dark:bg-slate-800 rounded-3xl border border-gray-100 dark:border-slate-700 overflow-hidden shadow-sm flex flex-col md:col-span-2 lg:col-span-1">
+                                        <div className="p-6 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center">
+                                            <h3 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">Leave Registry</h3>
+                                            <Clock className="w-5 h-5 text-gray-400" />
+                                        </div>
+                                        <div className="max-h-[300px] overflow-y-auto flex-1">
+                                            {profilerData.leaves?.length > 0 ? (
+                                                <div className="divide-y divide-gray-50 dark:divide-slate-700/50">
+                                                    {profilerData.leaves.map((leave) => (
+                                                        <div key={leave.id} className="p-4 hover:bg-gray-50 dark:hover:bg-slate-700/10 transition-colors">
+                                                            <div className="flex justify-between items-start">
+                                                                <div>
+                                                                    <p className="text-xs font-bold text-gray-800 dark:text-slate-200 uppercase tracking-wide">{leave.leave_type}</p>
+                                                                    <p className="text-[10px] text-gray-400 mt-1">{new Date(leave.start_date).toLocaleDateString()} - {new Date(leave.end_date).toLocaleDateString()}</p>
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                    {(() => {
+                                                                        const isCompleted = leave.status === 'approved' && new Date(leave.end_date) < new Date(new Date().setHours(0, 0, 0, 0));
+                                                                        const displayStatus = isCompleted ? 'completed' : leave.status;
+
+                                                                        return (
+                                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${displayStatus === 'approved' ? 'bg-emerald-50 text-emerald-600' :
+                                                                                    displayStatus === 'completed' ? 'bg-slate-100 text-slate-500' :
+                                                                                        displayStatus === 'pending' ? 'bg-amber-50 text-amber-600' :
+                                                                                            displayStatus === 'cancelled' ? 'bg-gray-100 text-gray-400 line-through' : 'bg-red-50 text-red-600'
+                                                                                }`}>
+                                                                                {displayStatus}
+                                                                            </span>
+                                                                        );
+                                                                    })()}
+                                                                    {leave.status !== 'rejected' && leave.status !== 'cancelled' && (
+                                                                        <button
+                                                                            onClick={() => handleAction(leave.id, 'cancelled')}
+                                                                            title="Revoke Leave"
+                                                                            className="p-1 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg transition-colors"
+                                                                        >
+                                                                            <Trash2 className="w-3 h-3" />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            {leave.reason && <p className="text-[10px] text-gray-500 mt-2 italic">"{leave.reason}"</p>}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="text-center py-10 text-gray-400 text-xs font-bold uppercase tracking-wider">No leave history</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div className="p-8 border-t border-gray-100 dark:border-slate-800 flex justify-end bg-white dark:bg-slate-900 underline-offset-4">
+
+                        {/* Footer Actions */}
+                        <div className="p-6 border-t border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-end shrink-0">
                             <button
                                 onClick={() => setProfilerData(null)}
-                                className="px-8 py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl hover:scale-105 transition-all"
+                                className="px-8 py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg hover:scale-105 transition-all"
                             >
-                                Dismiss Profile
+                                Close Profile
                             </button>
                         </div>
                     </div>
@@ -381,7 +546,51 @@ const HODStaff = () => {
                     </div>
                     {/* ... form ... */}
                     <div className="p-8 space-y-6">
-                        {/* ... inputs ... */}
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">Leave Type</label>
+                                <select
+                                    value={newLeave.type}
+                                    onChange={(e) => setNewLeave({ ...newLeave, type: e.target.value })}
+                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold focus:border-violet-500 outline-none transition-colors"
+                                >
+                                    <option value="Casual Leave">Casual Leave</option>
+                                    <option value="Medical Leave">Medical Leave</option>
+                                    <option value="Earned Leave">Earned Leave</option>
+                                    <option value="On Duty">On Duty</option>
+                                </select>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">Start Date</label>
+                                    <input
+                                        type="date"
+                                        value={newLeave.start}
+                                        onChange={(e) => setNewLeave({ ...newLeave, start: e.target.value })}
+                                        className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold focus:border-violet-500 outline-none transition-colors"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">End Date</label>
+                                    <input
+                                        type="date"
+                                        value={newLeave.end}
+                                        onChange={(e) => setNewLeave({ ...newLeave, end: e.target.value })}
+                                        className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold focus:border-violet-500 outline-none transition-colors"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">Reason (Optional)</label>
+                                <textarea
+                                    value={newLeave.reason}
+                                    onChange={(e) => setNewLeave({ ...newLeave, reason: e.target.value })}
+                                    placeholder="Enter reason for leave..."
+                                    rows="3"
+                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold focus:border-violet-500 outline-none transition-colors resize-none"
+                                />
+                            </div>
+                        </div>
                         <div className="flex flex-col sm:flex-row gap-4">
                             <button onClick={() => setShowLeaveModal(false)} className="flex-1 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-2xl transition-all order-2 sm:order-1">Cancel</button>
                             <button onClick={registerLeave} className="flex-[2] py-4 bg-violet-600 text-white rounded-2xl text-[10px] font-black shadow-lg shadow-violet-500/30 hover:scale-105 active:scale-95 transition-all uppercase tracking-widest order-1 sm:order-2">Enforce Registry</button>

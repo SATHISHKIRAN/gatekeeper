@@ -10,6 +10,8 @@ const StatusRing = ({ status }) => {
         approved_warden: { color: 'text-purple-500', border: 'border-purple-500', bg: 'bg-purple-50', icon: Check, label: 'Ready for Gate' },
         rejected: { color: 'text-red-500', border: 'border-red-500', bg: 'bg-red-50', icon: X, label: 'Request Rejected' },
         generated: { color: 'text-green-500', border: 'border-green-500', bg: 'bg-green-50', icon: Check, label: 'Pass Generated' },
+        active: { color: 'text-blue-600', border: 'border-blue-600', bg: 'bg-blue-50', icon: Check, label: 'Student is Outside' },
+        out: { color: 'text-blue-600', border: 'border-blue-600', bg: 'bg-blue-50', icon: Check, label: 'Student is Outside' },
         completed: { color: 'text-gray-500', border: 'border-gray-500', bg: 'bg-gray-50', icon: Check, label: 'Trip Completed' },
     };
 

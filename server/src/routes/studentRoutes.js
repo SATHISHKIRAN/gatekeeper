@@ -10,6 +10,5 @@ router.get('/profile', verifyToken, authorizeRoles('student'), studentController
 router.get('/stats', verifyToken, authorizeRoles('student'), studentController.getDashboardStats);
 router.post('/cancel-pass', studentController.cancelPass);
 router.post('/change-password', studentController.changePassword);
-router.get('/wallet', studentController.getWalletData);
 
 module.exports = router;

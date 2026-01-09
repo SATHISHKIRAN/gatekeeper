@@ -7,6 +7,10 @@ const { verifyToken, authorizeRoles } = require('../middleware/authMiddleware');
 router.get('/', settingsController.getSettings);
 
 // Protected route to update settings (Admin only)
+// Protected route to update settings (Admin only)
 router.put('/', verifyToken, authorizeRoles('admin'), settingsController.updateSettings);
+
+// Verify Admin PIN
+router.post('/verify-pin', verifyToken, authorizeRoles('admin'), settingsController.verifyAdminPassword);
 
 module.exports = router;

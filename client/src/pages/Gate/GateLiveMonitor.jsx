@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useSocket } from '../../context/SocketContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import {
     Clock, AlertTriangle, CheckCircle, Search, RefreshCcw, User, Phone, MapPin,
     Calendar, Filter, LogIn, LogOut, CheckSquare, Square, Download, X, History,
-    Shield, MoreVertical, Flag
+    Shield, MoreVertical, Flag, Zap, Briefcase
 } from 'lucide-react';
+import AdvancedStudentProfiler from '../../components/AdvancedStudentProfiler';
 
 const GateLiveMonitor = () => {
     const [activeTab, setActiveTab] = useState('out'); // out, overdue, ready
@@ -19,13 +21,26 @@ const GateLiveMonitor = () => {
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [isBulkProcessing, setIsBulkProcessing] = useState(false);
     const [selectedStudent, setSelectedStudent] = useState(null); // For Modal
+    const [profileData, setProfileData] = useState(null); // Full profile data
     const [processingId, setProcessingId] = useState(null); // Single action loading
+
+    const { socket } = useSocket();
 
     useEffect(() => {
         fetchLiveData(true);
-        const interval = setInterval(() => fetchLiveData(false), 10000);
-        return () => clearInterval(interval);
-    }, []);
+
+        if (socket) {
+            socket.on('request_updated', () => {
+                fetchLiveData(false);
+            });
+        }
+
+        const interval = setInterval(() => fetchLiveData(false), 60000); // 1m Fallback
+        return () => {
+            clearInterval(interval);
+            if (socket) socket.off('request_updated');
+        };
+    }, [socket]);
 
     const fetchLiveData = async (showLoading = false) => {
         try {
@@ -36,6 +51,16 @@ const GateLiveMonitor = () => {
         } catch (err) {
             console.error("Error fetching live data", err);
             if (showLoading) setLoading(false);
+        }
+    };
+
+    const fetchStudentProfile = async (student) => {
+        try {
+            const res = await axios.get(`/api/gate/student-profile/${student.id}`);
+            setProfileData(res.data);
+            setSelectedStudent(student); // Open Modal
+        } catch (err) {
+            toast.error("Failed to load student profile");
         }
     };
 
@@ -259,7 +284,7 @@ const GateLiveMonitor = () => {
                                 filteredList.map(item => (
                                     <tr
                                         key={item.id}
-                                        onClick={() => setSelectedStudent(item)}
+                                        onClick={() => fetchStudentProfile(item)}
                                         className={`group cursor-pointer border-b border-gray-50 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition ${selectedIds.has(item.id) ? 'bg-indigo-50 dark:bg-indigo-900/10' : ''}`}
                                     >
                                         <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
@@ -361,67 +386,15 @@ const GateLiveMonitor = () => {
             </AnimatePresence>
 
             {/* PROFILE MODAL */}
-            <AnimatePresence>
-                {selectedStudent && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                        <motion.div
-                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            onClick={() => setSelectedStudent(null)}
-                            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                        />
-                        <motion.div
-                            initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                            className="relative bg-white dark:bg-slate-900 rounded-3xl p-0 max-w-lg w-full shadow-2xl z-10 overflow-hidden"
-                        >
-                            {/* Modal Header */}
-                            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-6 text-white text-center relative">
-                                <button onClick={() => setSelectedStudent(null)} className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full transition text-white">
-                                    <X className="w-5 h-5" />
-                                </button>
-                                <div className="w-24 h-24 bg-white rounded-full mx-auto mb-4 border-4 border-white/30 flex items-center justify-center text-3xl font-black text-indigo-600 shadow-xl">
-                                    {selectedStudent.student_name.charAt(0)}
-                                </div>
-                                <h2 className="text-2xl font-black">{selectedStudent.student_name}</h2>
-                                <p className="opacity-90 font-mono tracking-widest text-sm">{selectedStudent.register_number}</p>
-                            </div>
-
-                            {/* Modal Content */}
-                            <div className="p-8 space-y-6">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="p-4 bg-gray-50 dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700">
-                                        <p className="text-xs text-gray-400 uppercase font-bold mb-1">Department</p>
-                                        <p className="font-bold text-gray-900 dark:text-white">{selectedStudent.department_name}</p>
-                                    </div>
-                                    <div className="p-4 bg-gray-50 dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700">
-                                        <p className="text-xs text-gray-400 uppercase font-bold mb-1">Hostel</p>
-                                        <p className="font-bold text-gray-900 dark:text-white">{selectedStudent.hostel_name || 'Day Scholar'}</p>
-                                    </div>
-                                    <div className="p-4 bg-gray-50 dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700">
-                                        <p className="text-xs text-gray-400 uppercase font-bold mb-1">Pass Type</p>
-                                        <p className="font-bold text-gray-900 dark:text-white capitalize">{selectedStudent.type}</p>
-                                    </div>
-                                    <div className="p-4 bg-gray-50 dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700">
-                                        <p className="text-xs text-gray-400 uppercase font-bold mb-1">Phone</p>
-                                        <p className="font-bold text-gray-900 dark:text-white">{selectedStudent.phone}</p>
-                                    </div>
-                                </div>
-
-                                <div className="bg-amber-50 dark:bg-amber-900/10 p-4 rounded-xl border border-amber-100 dark:border-amber-900/30 flex items-start gap-3">
-                                    <Flag className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                                    <div>
-                                        <h4 className="font-bold text-amber-800 dark:text-amber-400 text-sm">Gate Pass Timeline</h4>
-                                        <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">
-                                            Departed: {new Date(selectedStudent.departure_date).toLocaleString()}<br />
-                                            Expected Return: {new Date(selectedStudent.return_date).toLocaleString()}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+            <AdvancedStudentProfiler
+                isOpen={!!selectedStudent}
+                onClose={() => { setSelectedStudent(null); setProfileData(null); }}
+                data={profileData}
+                onUpdate={() => {
+                    fetchLiveData(false);
+                    if (selectedStudent) fetchStudentProfile(selectedStudent);
+                }}
+            />
         </div>
     );
 };

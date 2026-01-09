@@ -129,19 +129,18 @@ const GateHistory = () => {
                                 <th className="p-5 font-bold text-gray-500 dark:text-slate-400 uppercase text-xs tracking-wider">Student</th>
                                 <th className="p-5 font-bold text-gray-500 dark:text-slate-400 uppercase text-xs tracking-wider">Type</th>
                                 <th className="p-5 font-bold text-gray-500 dark:text-slate-400 uppercase text-xs tracking-wider">Gatekeeper</th>
-                                <th className="p-5 font-bold text-gray-500 dark:text-slate-400 uppercase text-xs tracking-wider">Comments</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50 dark:divide-slate-800">
                             {loading && logs.length === 0 ? (
                                 <tr>
-                                    <td colSpan="5" className="p-10 text-center">
+                                    <td colSpan="4" className="p-10 text-center">
                                         <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
                                     </td>
                                 </tr>
                             ) : filteredLogs.length === 0 ? (
                                 <tr>
-                                    <td colSpan="5" className="p-10 text-center text-gray-400">No logs found matching your criteria.</td>
+                                    <td colSpan="4" className="p-10 text-center text-gray-400">No logs found matching your criteria.</td>
                                 </tr>
                             ) : (
                                 filteredLogs.map((log) => (
@@ -175,9 +174,6 @@ const GateHistory = () => {
                                         </td>
                                         <td className="p-5 text-gray-500 dark:text-slate-400">
                                             {log.gatekeeper_name || 'System'}
-                                        </td>
-                                        <td className="p-5 text-gray-500 dark:text-slate-400 max-w-xs truncate">
-                                            {log.comments || '-'}
                                         </td>
                                     </tr>
                                 ))

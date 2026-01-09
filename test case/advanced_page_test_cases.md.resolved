@@ -1,0 +1,125 @@
+# Advanced Page-Wise Manual Test Cases
+
+This document details "black-box" testing scenarios for every major page in the UniVerse GateKeeper application.
+
+---
+
+## 🔐 1. Public / Authentication
+
+### **Login Page** ([Login.jsx](file:///c:/Users/mahesh-13145/Downloads/sk/gate/client/src/pages/Login.jsx))
+| Test ID | Element | Action | Expectation | Edge/Error Case |
+| :--- | :--- | :--- | :--- | :--- |
+| **PUB-01** | **Email Input** | Entering invalid email format (e.g., `abc`) | HTML5 validation warning or inline error "Invalid Email". | Paste large string. |
+| **PUB-02** | **Password Toggle** | Click "Eye" icon | Password field toggles between `text` and `password`. |  |
+| **PUB-03** | **Login Button** | Click with empty fields | Prevents API call, highlights invalid fields. |  |
+| **PUB-04** | **Forgot Password** | Click Link | Navigates to `/forgot-password`. |  |
+| **PUB-05** | **Role Redirection** | Login as Student | Redirects to `/student/dashboard`. | Login with suspended account. |
+
+### **Forgot Password** ([ForgotPassword.jsx](file:///c:/Users/mahesh-13145/Downloads/sk/gate/client/src/pages/ForgotPassword.jsx))
+| Test ID | Element | Action | Expectation | Edge/Error Case |
+| :--- | :--- | :--- | :--- | :--- |
+| **FP-01** | **Send OTP** | Enter registered email | Success Toast: "OTP sent". Input changes to OTP field. | Enter unregistered email. |
+| **FP-02** | **Verify OTP** | Enter valid OTP | Enables "Reset Password" input. | Enter wrong OTP x3 times. |
+| **FP-03** | **Resend OTP** | Click "Resend" | Timer resets, New OTP sent. | Click before cooldown. |
+
+---
+
+## 🎓 2. Student Module
+
+### **Dashboard** ([Student/Dashboard.jsx](file:///c:/Users/mahesh-13145/Downloads/sk/gate/client/src/pages/Student/Dashboard.jsx))
+| Test ID | Element | Action | Expectation | Edge/Error Case |
+| :--- | :--- | :--- | :--- | :--- |
+| **STU-DB-01**| **Quick Stats** | View "Passes Left" | Matches backend limit (e.g., 2/4 used). | User with 0 passes. |
+| **STU-DB-02**| **New Pass Modal**| Click "Request Pass" | Modal opens with Date/Reason inputs. |  |
+| **STU-DB-03**| **Date Picker** | Select past date | Should be disabled or show error on submit. | Select date > Max days allowed. |
+| **STU-DB-04**| **Submit Request**| Fill & Submit | Toast: "Request Submitted". Appears in "Active Request" list. | Network disconnect. |
+| **STU-DB-05**| **QR Code** | View Active Pass | QR Code visible, updates on refresh. | Pass expired/Rejected. |
+
+### **History** ([Student/History.jsx](file:///c:/Users/mahesh-13145/Downloads/sk/gate/client/src/pages/Student/History.jsx))
+| Test ID | Element | Action | Expectation | Edge/Error Case |
+| :--- | :--- | :--- | :--- | :--- |
+| **STU-HIS-01**| **Sort/Filter** | Filter by "Status: Rejected" | Only rejected passes shown. | Empty specific filter results. |
+| **STU-HIS-02**| **Load More** | Scroll to bottom | Pagination loads older records. | No history available. |
+
+---
+
+## 👔 3. HOD Module (Advanced)
+
+### **Dashboard** ([HOD/Dashboard.jsx](file:///c:/Users/mahesh-13145/Downloads/sk/gate/client/src/pages/HOD/Dashboard.jsx))
+| Test ID | Element | Action | Expectation | Edge/Error Case |
+| :--- | :--- | :--- | :--- | :--- |
+| **HOD-DB-01**| **Live Stats** | View "Pending Requests" | Count matches "Requests.jsx" tally. |  |
+| **HOD-DB-02**| **Year Toggle** | Toggle "Restrict 1st Year" | Instant Toast: "Restriction Applied". |  |
+| **HOD-DB-03**| **Recent Activity**| Click Student Name | Redirects to Student Profile. |  |
+
+### **Requests** ([HOD/Requests.jsx](file:///c:/Users/mahesh-13145/Downloads/sk/gate/client/src/pages/HOD/Requests.jsx))
+| Test ID | Element | Action | Expectation | Edge/Error Case |
+| :--- | :--- | :--- | :--- | :--- |
+| **HOD-REQ-01**| **Select All** | Checkbox in Header | All visible rows selected. | Pagination persistence? |
+| **HOD-REQ-02**| **Bulk Approve** | Click "Approve Selected" | Processing spinner -> Success Toast. Rows disappear. | Select 0 items -> Button Disabled. |
+| **HOD-REQ-03**| **Search** | Type Student Name | Table filters dynamically. | Special characters check. |
+
+### **Students Management** ([HOD/Students.jsx](file:///c:/Users/mahesh-13145/Downloads/sk/gate/client/src/pages/HOD/Students.jsx))
+| Test ID | Element | Action | Expectation | Edge/Error Case |
+| :--- | :--- | :--- | :--- | :--- |
+| **HOD-STU-01**| **Block Pass** | Click "Block User" on row | Icon changes (Red), User can't apply. | Block already blocked user. |
+| **HOD-STU-02**| **Export CSV** | Click "Export" | Downloads .csv file with student data. |  |
+
+### **Medical Override** ([HOD/Medical.jsx](file:///c:/Users/mahesh-13145/Downloads/sk/gate/client/src/pages/HOD/Medical.jsx))
+| Test ID | Element | Action | Expectation | Edge/Error Case |
+| :--- | :--- | :--- | :--- | :--- |
+| **HOD-MED-01**| **Student Search**| Enter partial Reg No | Dropdown suggestions appear. | Invalid Reg No. |
+| **HOD-MED-02**| **Force Issue** | Click "Issue Pass" | Bypass all validations, pass becomes `approved_hod`. |  |
+
+---
+
+## 🛡️ 4. Gatekeeper Module
+
+### **Verification Console** ([Gate/Scanner.jsx](file:///c:/Users/mahesh-13145/Downloads/sk/gate/client/src/pages/Gate/Scanner.jsx) -> `Gate/Verification.jsx`)
+| Test ID | Element | Action | Expectation | Edge/Error Case |
+| :--- | :--- | :--- | :--- | :--- |
+| **GK-VER-01**| **ID Input** | Enter Valid Reg No | Fetches Student Data + Active Pass Status. | invalid Reg No format. |
+| **GK-VER-02**| **Verify Button** | Click "Verify/Check" | Shows large status card (Allowed/Denied). | Network Error. |
+| **GK-VER-03**| **Action Log** | Confirm Entry/Exit | Updates database status (check-in/out). |  |
+| **GK-VER-04**| **Recent Logs** | View List below input | Shows last 5 verification actions. |  |
+
+### **Visitor Management** ([Gate/VisitorManagement.jsx](file:///c:/Users/mahesh-13145/Downloads/sk/gate/client/src/pages/Gate/VisitorManagement.jsx))
+| Test ID | Element | Action | Expectation | Edge/Error Case |
+| :--- | :--- | :--- | :--- | :--- |
+| **GK-VIS-01**| **New Visitor** | Submit Form | New row added to "Active Visitors". | Missing Phone Number. |
+| **GK-VIS-02**| **Checkout** | Click "Exit" on row | Checkout Time stamped, row moves to History. |  |
+| **GK-VIS-03**| **Contract List**| Switch Tab "Contract" | Shows Contract workers. |  |
+| **GK-VIS-04**| **Toggle Worker**| Click "Toggle Entry" | Status flips `In` <-> `Out`. |  |
+
+---
+
+## 🛠️ 5. Admin Module
+
+### **System Settings** ([Admin/SystemSettings.jsx](file:///c:/Users/mahesh-13145/Downloads/sk/gate/client/src/pages/Admin/SystemSettings.jsx))
+| Test ID | Element | Action | Expectation | Edge/Error Case |
+| :--- | :--- | :--- | :--- | :--- |
+| **ADM-SET-01**| **Maintenance** | Toggle "Maintenance Mode"| All regular users logged out/blocked. | Admin should remain active. |
+| **ADM-SET-02**| **Theme Color** | Change Primary Color | UI Colors update immediately. |  |
+
+### **Students Master** ([Admin/Students.jsx](file:///c:/Users/mahesh-13145/Downloads/sk/gate/client/src/pages/Admin/Students.jsx))
+| Test ID | Element | Action | Expectation | Edge/Error Case |
+| :--- | :--- | :--- | :--- | :--- |
+| **ADM-STU-01**| **Edit Student** | Click Pencil Icon | Modal with all fields editable. | Change Email to existing one. |
+| **ADM-STU-02**| **Delete Student**| Click Trash Icon | Confirm Modal -> Row removed. |  |
+| **ADM-STU-03**| **Import Bulk** | Upload Excel | Progress bar -> "X users added". | Malformed Excel. |
+
+---
+
+## 🧑‍🏫 6. Staff Module
+
+### **My Students** ([Staff/MyStudents.jsx](file:///c:/Users/mahesh-13145/Downloads/sk/gate/client/src/pages/Staff/MyStudents.jsx))
+| Test ID | Element | Action | Expectation | Edge/Error Case |
+| :--- | :--- | :--- | :--- | :--- |
+| **STF-MYS-01**| **View Profile** | Click Student Card | Drawer/Modal with detailed academic info. |  |
+| **STF-MYS-02**| **Message** | Click WhatsApp Icon | Opens `wa.me` link with pre-filled text. | Student has no phone number. |
+
+### **Queue** ([Staff/Queue.jsx](file:///c:/Users/mahesh-13145/Downloads/sk/gate/client/src/pages/Staff/Queue.jsx))
+| Test ID | Element | Action | Expectation | Edge/Error Case |
+| :--- | :--- | :--- | :--- | :--- |
+| **STF-Q-01** | **Quick Approve**| Swipe/Click "Approve"| Card removed, Count Decreases. |  |
+| **STF-Q-02** | **Add Comment** | Before Rejecting | Input comment -> Reject -> Saved in log. |  |

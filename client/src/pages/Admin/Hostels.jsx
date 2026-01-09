@@ -39,8 +39,10 @@ const AdminHostels = () => {
 
     // Forms
     const [formData, setFormData] = useState({
-        hostel: { name: '', type: 'Boys', description: '', warden_id: '' },
+        hostel: { name: '', type: 'Boys', description: '', warden_id: '', capacity: 0 },
     });
+
+    const [mobileTab, setMobileTab] = useState('unassigned');
 
     // Stats
     const [stats, setStats] = useState({
@@ -187,7 +189,7 @@ const AdminHostels = () => {
             loading: formData.hostel.id ? 'Updating hostel...' : 'Creating hostel...',
             success: () => {
                 toggleModal('hostel', false);
-                setFormData(p => ({ ...p, hostel: { name: '', type: 'Boys', description: '', warden_id: '' } }));
+                setFormData(p => ({ ...p, hostel: { name: '', type: 'Boys', description: '', warden_id: '', capacity: 0 } }));
                 fetchData();
                 return formData.hostel.id ? 'Hostel updated successfully' : 'Hostel created successfully';
             },
@@ -224,7 +226,24 @@ const AdminHostels = () => {
         }
     };
 
+    const handleDeleteHostel = async (id) => {
+        const promise = axios.delete(`/api/hostels/${id}`);
 
+        toast.promise(promise, {
+            loading: 'Deleting hostel block...',
+            success: () => {
+                fetchData();
+                return 'Hostel deleted & students unassigned';
+            },
+            error: 'Failed to delete hostel'
+        });
+
+        try {
+            await promise;
+        } catch (error) {
+            console.error(error);
+        }
+    };
 
     // --- Views ---
 
@@ -262,13 +281,25 @@ const AdminHostels = () => {
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                setFormData(p => ({ ...p, hostel: { ...hostel, warden_id: hostel.warden_id || '' } }));
+                                setFormData(p => ({ ...p, hostel: { ...hostel, warden_id: hostel.warden_id || '', capacity: hostel.capacity || 0 } }));
                                 toggleModal('hostel', true);
                             }}
                             className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                             title="Edit Hostel"
                         >
                             <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm(`Are you sure you want to delete ${hostel.name}? Assigned students will be moved to 'Unassigned'.`)) {
+                                    handleDeleteHostel(hostel.id);
+                                }
+                            }}
+                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                            title="Delete Hostel"
+                        >
+                            <Trash2 className="w-4 h-4" />
                         </button>
                     </div>
                 </div>
@@ -278,13 +309,14 @@ const AdminHostels = () => {
                         <div className="flex justify-between text-sm mb-1.5">
                             <span className="text-slate-600 dark:text-slate-400">Occupancy</span>
                             <span className="font-medium text-slate-900 dark:text-white">
-                                {Math.round((hostel.active_students / (hostel.total_rooms * 2)) * 100) || 0}%
+                                {hostel.active_students} / {hostel.capacity || 'Inf'}
                             </span>
                         </div>
                         <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                             <div
-                                className="h-full bg-indigo-500 rounded-full transition-all duration-500"
-                                style={{ width: `${(hostel.active_students / (hostel.total_rooms * 2)) * 100}%` }}
+                                className={`h-full rounded-full transition-all duration-500 ${hostel.active_students > (hostel.capacity || 9999) ? 'bg-red-500' : 'bg-indigo-500'
+                                    }`}
+                                style={{ width: `${Math.min(((hostel.active_students / (hostel.capacity || 1)) * 100), 100)}%` }}
                             />
                         </div>
                     </div>
@@ -349,7 +381,7 @@ const AdminHostels = () => {
                     {view === 'list' && (
                         <button
                             onClick={() => {
-                                setFormData(p => ({ ...p, hostel: { name: '', type: 'Boys', description: '', warden_id: '' } }));
+                                setFormData(p => ({ ...p, hostel: { name: '', type: 'Boys', description: '', warden_id: '', capacity: 0 } }));
                                 toggleModal('hostel', true);
                             }}
                             className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all shadow-md shadow-indigo-600/20"
@@ -548,6 +580,10 @@ const AdminHostels = () => {
                     <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Hostel Name</label>
                         <input required type="text" placeholder="Block A" value={formData.hostel.name} onChange={e => setFormData(p => ({ ...p, hostel: { ...p.hostel, name: e.target.value } }))} className="w-full px-4 py-2 border rounded-lg bg-slate-50 dark:bg-slate-900 dark:border-slate-700" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Total Capacity (Students)</label>
+                        <input required type="number" min="0" placeholder="e.g. 200" value={formData.hostel.capacity} onChange={e => setFormData(p => ({ ...p, hostel: { ...p.hostel, capacity: e.target.value } }))} className="w-full px-4 py-2 border rounded-lg bg-slate-50 dark:bg-slate-900 dark:border-slate-700" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Type</label>

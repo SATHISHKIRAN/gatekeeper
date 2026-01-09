@@ -1,12 +1,23 @@
 const db = require('../config/database');
 const bcrypt = require('bcrypt');
+const fs = require('fs');
+const path = require('path');
 
 exports.getGlobalStats = async (req, res) => {
     try {
         // 1. Basic Counts
         const [[{ count: total_students }]] = await db.query('SELECT COUNT(*) as count FROM users WHERE role = "student"');
         const [[{ count: total_requests }]] = await db.query('SELECT COUNT(*) as count FROM requests');
-        const [[{ count: active_passes }]] = await db.query('SELECT COUNT(*) as count FROM requests WHERE status = "generated"');
+        const [[{ count: active_passes }]] = await db.query(`
+            SELECT COUNT(r.id) as count FROM requests r
+            JOIN users u ON r.user_id = u.id
+            WHERE (
+                (u.student_type = 'Day Scholar' AND r.status = 'approved_hod') 
+                OR (u.student_type = 'Hostel' AND r.status = 'approved_warden')
+                OR (r.status = 'completed' AND r.updated_at >= DATE_SUB(NOW(), INTERVAL 1 DAY))
+                OR (r.status = 'pending')
+            )
+        `);
 
         // 2. Departmental Analytics (Outings per Department)
         const [department_stats] = await db.query(`
@@ -19,26 +30,26 @@ exports.getGlobalStats = async (req, res) => {
 
         // 3. Weekly Trends (Last 7 Days)
         const [weekly_trends] = await db.query(`
-            SELECT DATE(created_at) as date, COUNT(*) as count 
-            FROM requests 
-            WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) 
-            GROUP BY DATE(created_at)
+            SELECT DATE(r.created_at) as date, COUNT(r.id) as count 
+            FROM requests r
+            WHERE r.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) 
+            GROUP BY DATE(r.created_at)
             ORDER BY date
         `);
 
         // 4. Request Type Distribution
         const [type_distribution] = await db.query(`
-            SELECT type as name, COUNT(*) as value 
-            FROM requests 
-            GROUP BY type
+            SELECT r.type as name, COUNT(r.id) as value 
+            FROM requests r
+            GROUP BY r.type
         `);
 
         // 5. Hourly Activity (Last 24 Hours)
         const [hourly_activity] = await db.query(`
-            SELECT HOUR(timestamp) as hour, action, COUNT(*) as count 
-            FROM logs 
-            WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 24 HOUR) 
-            GROUP BY HOUR(timestamp), action
+            SELECT HOUR(l.timestamp) as hour, l.action, COUNT(l.id) as count 
+            FROM logs l
+            WHERE l.timestamp >= DATE_SUB(NOW(), INTERVAL 24 HOUR) 
+            GROUP BY HOUR(l.timestamp), l.action
             ORDER BY hour
         `);
 
@@ -66,6 +77,34 @@ exports.getGlobalStats = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
+    }
+};
+
+exports.getProfile = async (req, res) => {
+    try {
+        const adminId = req.user.id;
+        const [users] = await db.query('SELECT id, name, email, role, phone, created_at FROM users WHERE id = ?', [adminId]);
+
+        if (users.length === 0) return res.status(404).json({ message: 'Admin not found' });
+        const admin = users[0];
+
+        // Fetch System Health Stats for Profile
+        const [[{ total_users }]] = await db.query('SELECT COUNT(*) as total_users FROM users');
+        const [[{ total_requests }]] = await db.query('SELECT COUNT(*) as total_requests FROM requests');
+        const [[{ active_issues }]] = await db.query('SELECT COUNT(*) as active_issues FROM requests WHERE status = "pending"');
+
+        res.json({
+            user: admin,
+            stats: {
+                total_users,
+                total_requests,
+                active_issues,
+                system_status: 'Operational'
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error fetching admin profile' });
     }
 };
 
@@ -109,12 +148,20 @@ exports.getHostels = async (req, res) => {
 };
 
 exports.createUser = async (req, res) => {
-    const { name, email, password, role, department_id, phone, year, register_number, student_type, hostel_id } = req.body;
+    const { name, email, password, role, department_id, phone, year, register_number, hostel_id } = req.body;
+    let { student_type } = req.body;
+
+    // Normalize student_type
+    if (student_type && student_type.toLowerCase() === 'hostel') student_type = 'Hostel';
+    if (student_type && student_type.toLowerCase().includes('day')) student_type = 'Day Scholar';
+
+    const profile_image = req.file ? req.file.filename : null;
+
     try {
         const password_hash = await bcrypt.hash(password, 10);
         await db.query(
-            'INSERT INTO users (name, email, password_hash, role, department_id, phone, year, register_number, status, student_type, hostel_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, "active", ?, ?)',
-            [name, email, password_hash, role, department_id, phone, year, register_number, student_type, hostel_id || null]
+            'INSERT INTO users (name, email, password_hash, role, department_id, phone, year, register_number, status, student_type, hostel_id, profile_image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, "active", ?, ?, ?)',
+            [name, email, password_hash, role, department_id, phone, year, register_number, student_type, hostel_id || null, profile_image]
         );
         res.json({ message: 'User created successfully' });
     } catch (error) {
@@ -122,21 +169,57 @@ exports.createUser = async (req, res) => {
         if (error.code === 'ER_DUP_ENTRY') {
             return res.status(400).json({ message: 'Email already registered' });
         }
-        res.status(500).json({ message: 'Error creating user' });
+        res.status(500).json({ message: 'Error creating user', error: error.message, stack: error.stack });
     }
 };
 
 exports.updateUser = async (req, res) => {
     const { id } = req.params;
     const { name, role, department_id, trust_score, status, phone, year, register_number, email, student_type, hostel_id } = req.body;
-    try {
-        // Fetch current state to check for trust score change
-        const [[currentUser]] = await db.query('SELECT trust_score FROM users WHERE id = ?', [id]);
+    const remove_profile_image = req.body.remove_profile_image === 'true'; // Check string 'true' from FormData
+    const profile_image = req.file ? req.file.filename : undefined;
 
-        await db.query(
-            'UPDATE users SET name = ?, role = ?, department_id = ?, trust_score = ?, status = ?, phone = ?, year = ?, register_number = ?, email = ?, student_type = ?, hostel_id = ? WHERE id = ?',
-            [name, role, department_id, trust_score, status, phone, year, register_number, email, student_type, hostel_id || null, id]
-        );
+    try {
+        // Fetch current user data (for trust score and old image)
+        const [[currentUser]] = await db.query('SELECT trust_score, profile_image, role FROM users WHERE id = ?', [id]);
+
+        let updateQuery = 'UPDATE users SET name = ?, role = ?, department_id = ?, trust_score = ?, status = ?, phone = ?, year = ?, register_number = ?, email = ?, student_type = ?, hostel_id = ?';
+        let queryParams = [name, role, department_id, trust_score, status, phone, year, register_number, email, student_type, hostel_id || null];
+
+        const getOldImagePath = (imageName, userRole) => {
+            const baseDir = ['staff', 'hod', 'warden', 'gatekeeper', 'admin', 'principal'].includes(userRole)
+                ? 'c:\\Users\\mahesh-13145\\Downloads\\sk\\gate\\client\\public\\img\\staff'
+                : 'c:\\Users\\mahesh-13145\\Downloads\\sk\\gate\\client\\public\\img\\student';
+            return path.join(baseDir, imageName);
+        };
+
+
+        // Logic for image update/removal
+        if (profile_image) {
+            // New image uploaded
+            updateQuery += ', profile_image = ?';
+            queryParams.push(profile_image);
+
+            // Delete old image if exists
+            if (currentUser.profile_image) {
+                const oldPath = getOldImagePath(currentUser.profile_image, currentUser.role);
+                if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+            }
+        } else if (remove_profile_image) {
+            // Explicit removal requested
+            updateQuery += ', profile_image = NULL';
+
+            // Delete old image if exists
+            if (currentUser.profile_image) {
+                const oldPath = getOldImagePath(currentUser.profile_image, currentUser.role);
+                if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+            }
+        }
+
+        updateQuery += ' WHERE id = ?';
+        queryParams.push(id);
+
+        await db.query(updateQuery, queryParams);
 
         // Auto-log trust score change
         if (currentUser && currentUser.trust_score != trust_score) {
@@ -155,8 +238,27 @@ exports.updateUser = async (req, res) => {
 
 exports.deleteUser = async (req, res) => {
     try {
+        // 1. Get user's profile image and role
+        const [users] = await db.query('SELECT profile_image, role FROM users WHERE id = ?', [req.params.id]);
+
+        if (users.length > 0) {
+            const { profile_image, role } = users[0];
+            if (profile_image) {
+                const baseDir = ['staff', 'hod', 'warden', 'gatekeeper', 'admin', 'principal'].includes(role)
+                    ? 'c:\\Users\\mahesh-13145\\Downloads\\sk\\gate\\client\\public\\img\\staff'
+                    : 'c:\\Users\\mahesh-13145\\Downloads\\sk\\gate\\client\\public\\img\\student';
+
+                const imagePath = path.join(baseDir, profile_image);
+                // 2. Delete file if exists
+                if (fs.existsSync(imagePath)) {
+                    fs.unlinkSync(imagePath);
+                }
+            }
+        }
+
+        // 3. Delete user record
         await db.query('DELETE FROM users WHERE id = ?', [req.params.id]);
-        res.json({ message: 'User deleted successfully' });
+        res.json({ message: 'User and associated data deleted successfully' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Error deleting user' });
@@ -178,9 +280,10 @@ exports.resetUserPassword = async (req, res) => {
 
 exports.getStudentOversight = async (req, res) => {
     const { id } = req.params;
+
     try {
         // 1. Fetch Student Identity
-        const [[student]] = await db.query(`
+        const [studentRows] = await db.query(`
             SELECT u.*, d.name as department_name, h.name as hostel_name 
             FROM users u 
             LEFT JOIN departments d ON u.department_id = d.id 
@@ -188,10 +291,15 @@ exports.getStudentOversight = async (req, res) => {
             WHERE u.id = ?
         `, [id]);
 
-        // 2. Trust History (Extended)
-        const [trustHistory] = await db.query('SELECT * FROM trust_history WHERE user_id = ? ORDER BY created_at DESC', [id]);
+        const student = studentRows[0];
+        if (!student) {
+            return res.status(404).json({ message: 'Student not found' });
+        }
 
-        // 3. Mobility History (Last 30 Days for Charts)
+        // 2. Trust History
+        const [trustHistory] = await db.query('SELECT th.* FROM trust_history th WHERE th.user_id = ? ORDER BY th.created_at DESC', [id]);
+
+        // 3. Mobility History
         const [mobilityLogs] = await db.query(`
             SELECT l.*, r.type as request_type 
             FROM logs l 
@@ -200,28 +308,44 @@ exports.getStudentOversight = async (req, res) => {
             ORDER BY l.timestamp DESC
         `, [id]);
 
-        // 4. Full Request History
+        // 4. Request History
         const [requests] = await db.query(`
-            SELECT * FROM requests 
-            WHERE user_id = ? 
-            ORDER BY created_at DESC 
+            SELECT r.* FROM requests r
+            WHERE r.user_id = ? 
+            ORDER BY r.created_at DESC 
             LIMIT 50
         `, [id]);
 
         // 5. Pass Statistics
-        const [[stats]] = await db.query(`
+        const [statsRows] = await db.query(`
             SELECT 
-            COUNT(*) as total_passes,
-            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
-            SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected,
-                SUM(CASE WHEN status = 'approved_warden' THEN 1 ELSE 0 END) as active
-            FROM requests WHERE user_id = ?
-        `, [id]);
+                COUNT(r.id) as total_passes,
+                COALESCE(SUM(CASE WHEN LOWER(r.status) = 'completed' THEN 1 ELSE 0 END), 0) as completed,
+                COALESCE(SUM(CASE WHEN LOWER(r.status) = 'rejected' THEN 1 ELSE 0 END), 0) as rejected,
+                COALESCE(SUM(CASE 
+                    WHEN (LOWER(?) LIKE '%day%' AND LOWER(r.status) = 'approved_hod') 
+                    OR (LOWER(?) = 'hostel' AND LOWER(r.status) = 'approved_warden') 
+                    THEN 1 ELSE 0 END), 0) as active
+            FROM requests r
+            WHERE r.user_id = ?
+        `, [student.student_type || '', student.student_type || '', id]);
 
-        res.json({ student, trustHistory, mobilityLogs, requests, stats });
+        const stats = statsRows[0] || { total_passes: 0, completed: 0, rejected: 0, active: 0 };
+
+        res.json({
+            student,
+            trustHistory: trustHistory || [],
+            mobilityLogs: mobilityLogs || [],
+            requests: requests || [],
+            stats
+        });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Oversight sync failed' });
+        console.error(`[ERROR] Oversight failed for student ID ${id}:`, error);
+        res.status(500).json({
+            message: 'Oversight sync failed',
+            error: error.message,
+            sql: error.sql
+        });
     }
 };
 
@@ -246,9 +370,9 @@ exports.getDepartments = async (req, res) => {
 };
 
 exports.createDepartment = async (req, res) => {
-    const { name, code, description } = req.body;
+    const { name, description } = req.body;
     try {
-        await db.query('INSERT INTO departments (name, code, description) VALUES (?, ?, ?)', [name, code, description]);
+        await db.query('INSERT INTO departments (name, description) VALUES (?, ?)', [name, description]);
         res.json({ message: 'Department created successfully' });
     } catch (error) {
         console.error(error);
@@ -258,11 +382,11 @@ exports.createDepartment = async (req, res) => {
 
 exports.updateDepartment = async (req, res) => {
     const { id } = req.params;
-    const { name, code, description, hod_id } = req.body;
+    const { name, description, hod_id } = req.body;
     try {
         await db.query(
-            'UPDATE departments SET name = ?, code = ?, description = ?, hod_id = ? WHERE id = ?',
-            [name, code, description, hod_id || null, id]
+            'UPDATE departments SET name = ?, description = ?, hod_id = ? WHERE id = ?',
+            [name, description, hod_id || null, id]
         );
         res.json({ message: 'Department updated successfully' });
     } catch (error) {
@@ -430,9 +554,11 @@ exports.getGateLiveStatus = async (req, res) => {
             JOIN users u ON r.user_id = u.id
             LEFT JOIN departments d ON u.department_id = d.id
             LEFT JOIN hostels h ON u.hostel_id = h.id
-            WHERE r.status IN ('generated', 'approved_warden') 
-            -- 'approved_warden' might be waiting for generation? usually 'generated' means QR is ready.
-            -- We focus on 'generated' as "Active/Live" cycle.
+            WHERE (
+                (u.student_type = 'day_scholar' AND r.status = 'approved_hod') 
+                OR (u.student_type = 'hostel' AND r.status = 'approved_warden')
+                OR (r.status = 'active')
+            )
         `);
 
         const ready = [];
@@ -544,5 +670,70 @@ exports.getGateHistory = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Error fetching gate history' });
+    }
+};
+exports.getReports = async (req, res) => {
+    try {
+        const { startDate, endDate, status, year, studentType, departmentId, hostelId } = req.query;
+
+        // Base Query - Global Scope
+        let query = `
+            SELECT 
+                r.id, r.type, r.reason, r.status, r.created_at, r.departure_date, r.return_date,
+                u.name as student_name, u.register_number, u.year, u.student_type, u.phone as student_phone,
+                d.name as department_name,
+                h.name as hostel_name, room.room_number,
+                m.name as mentor_name
+            FROM requests r
+            JOIN users u ON r.user_id = u.id
+            LEFT JOIN departments d ON u.department_id = d.id
+            LEFT JOIN users m ON u.mentor_id = m.id
+            LEFT JOIN hostels h ON u.hostel_id = h.id
+            LEFT JOIN rooms room ON u.room_id = room.id
+            WHERE 1=1
+        `;
+
+        const params = [];
+
+        if (startDate && endDate) {
+            query += ` AND r.created_at BETWEEN ? AND ?`;
+            params.push(`${startDate} 00:00:00`, `${endDate} 23:59:59`);
+        }
+
+        if (status) {
+            const statusArray = status.split(',');
+            query += ` AND r.status IN (?)`;
+            params.push(statusArray);
+        }
+
+        if (year) {
+            const yearArray = year.split(',');
+            query += ` AND u.year IN (?)`;
+            params.push(yearArray);
+        }
+
+        if (studentType) {
+            query += ` AND u.student_type = ?`;
+            params.push(studentType);
+        }
+
+        if (departmentId) {
+            query += ` AND u.department_id = ?`;
+            params.push(departmentId);
+        }
+
+        if (hostelId) {
+            query += ` AND u.hostel_id = ?`;
+            params.push(hostelId);
+        }
+
+        query += ` ORDER BY r.created_at DESC LIMIT 1000`; // Safety limit for admin
+
+        const [results] = await db.query(query, params);
+
+        res.json(results);
+    } catch (error) {
+        console.error('Admin Reports Error:', error);
+        res.status(500).json({ message: 'Failed to generate report' });
     }
 };

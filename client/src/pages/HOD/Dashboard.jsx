@@ -4,7 +4,7 @@ import {
     Users, FileText, CheckCircle, AlertTriangle,
     ArrowUpRight, Activity, Zap, Shield,
     Layers, TrendingUp, Clock, ArrowRight,
-    Search, Bell, UserCheck, XCircle
+    Search, Bell, UserCheck, XCircle, ShieldCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -18,16 +18,33 @@ const HODDashboard = () => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [staff, setStaff] = useState([]);
-    const [pendingRequests, setPendingRequests] = useState([]);
+    const [requests, setRequests] = useState({ actions: [], registry: [] });
+    const [activeTab, setActiveTab] = useState('actions');
     const [showDelegationModal, setShowDelegationModal] = useState(false);
     const [delegationForm, setDelegationForm] = useState({ proxyId: '', start: '', end: '' });
+    const [delegationError, setDelegationError] = useState(null);
+
+    // Pagination for Pass Management
+    const [passPage, setPassPage] = useState(1);
+    const passesPerPage = 5;
+
+    useEffect(() => {
+        setPassPage(1);
+    }, [activeTab]);
 
     const navigate = useNavigate();
 
     useEffect(() => {
         fetchData();
         fetchStaff();
-        fetchPending();
+        fetchRequests();
+
+        const interval = setInterval(() => {
+            fetchData();
+            fetchRequests();
+        }, 5000);
+
+        return () => clearInterval(interval);
     }, []);
 
     const fetchData = async () => {
@@ -50,16 +67,17 @@ const HODDashboard = () => {
         }
     };
 
-    const fetchPending = async () => {
+    const fetchRequests = async () => {
         try {
-            const res = await axios.get('/api/queue/hod'); // Assuming this exists or using a similar route
-            setPendingRequests(res.data);
+            const res = await axios.get('/api/hod/requests');
+            setRequests(res.data);
         } catch (err) {
-            console.error('Pending queue sync failed');
+            console.error('Requests sync failed');
         }
     };
 
     const handleDelegation = async () => {
+        setDelegationError(null);
         try {
             await axios.post('/api/hod/set-proxy', {
                 proxyId: delegationForm.proxyId,
@@ -69,7 +87,8 @@ const HODDashboard = () => {
             setShowDelegationModal(false);
             fetchData();
         } catch (err) {
-            console.error('Delegation failed');
+            console.error('Delegation failed', err);
+            setDelegationError(err.response?.data?.message || 'Delegation failed. Please check inputs and try again.');
         }
     };
 
@@ -117,12 +136,83 @@ const HODDashboard = () => {
                 </div>
             </div>
 
+            {/* Operational Alerts Section */}
+            {(data.staffStats.details?.length > 0 || (data.proxyStatus?.has_conflict)) && (
+                <div className="space-y-4">
+                    {/* Critical Proxy Warning */}
+                    {data.proxyStatus?.has_conflict && (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="bg-red-500 rounded-2xl p-4 flex items-center justify-between shadow-lg shadow-red-500/20"
+                        >
+                            <div className="flex items-center gap-4 text-white">
+                                <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+                                    <AlertTriangle className="w-6 h-6 animate-pulse" />
+                                </div>
+                                <div>
+                                    <h3 className="font-black text-lg uppercase tracking-tight">Critical Warning: Proxy Conflict</h3>
+                                    <p className="text-xs font-bold text-red-100 uppercase tracking-widest opacity-90">
+                                        Active Assigned Proxy is on leave during delegation period. ({data.proxyStatus.conflict_details})
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowDelegationModal(true)}
+                                className="px-6 py-2 bg-white text-red-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-50 transition-colors"
+                            >
+                                Reassign Now
+                            </button>
+                        </motion.div>
+                    )}
+
+                    {/* Staff on Leave Ticker */}
+                    {data.staffStats.details?.length > 0 && (
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-gray-100 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-start md:items-center gap-6">
+                            <div className="flex items-center gap-3 shrink-0">
+                                <div className="p-2 bg-amber-100 dark:bg-amber-900/20 text-amber-600 rounded-xl">
+                                    <Activity className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Faculty Report</p>
+                                    <p className="font-bold text-gray-900 dark:text-white">Away Today</p>
+                                </div>
+                            </div>
+                            <div className="flex-1 flex flex-wrap gap-3">
+                                {data.staffStats.details.map((staff) => (
+                                    <div key={staff.id} className="group relative flex items-center gap-3 pl-1 pr-4 py-1.5 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 hover:border-indigo-100 hover:bg-indigo-50 dark:hover:bg-indigo-900/10 transition-all cursor-pointer" onClick={() => navigate('/hod/staff')}>
+                                        <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs uppercase shadow-sm">
+                                            {staff.name.charAt(0)}
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-bold text-gray-900 dark:text-white group-hover:text-indigo-700 transition-colors">{staff.name}</p>
+                                            <p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider group-hover:text-indigo-400">On Leave</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Core Metrics Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[
                     { label: 'Pending Passes', value: data.pending, icon: Clock, color: 'blue', desc: 'Awaiting Action' },
                     { label: 'Total Approved', value: data.approved, icon: CheckCircle, color: 'emerald', desc: 'Current Semester' },
-                    { label: 'Staff Presence', value: `${data.staffStats.on_duty}/${data.staffStats.total}`, icon: UserCheck, color: 'orange', desc: 'On Duty Members' },
+                    {
+                        label: 'Student Mobility',
+                        value: (
+                            <div className="flex items-baseline gap-1">
+                                <span>{data.mobilityStats?.out || 0}</span>
+                                <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">OUT</span>
+                            </div>
+                        ),
+                        icon: Users,
+                        color: 'indigo',
+                        desc: `${data.mobilityStats?.in || 0} In • ${data.mobilityStats?.overdue || 0} Overdue`
+                    },
                     {
                         label: 'Active Proxy',
                         value: data.proxyStatus ? (
@@ -144,9 +234,9 @@ const HODDashboard = () => {
                                 </button>
                             </div>
                         ) : 'None',
-                        icon: Shield,
-                        color: 'violet',
-                        desc: 'Assigned Assistant'
+                        icon: data.proxyStatus && data.staffStats.details?.some(s => s.id === data.proxyStatus.proxy_id && s.status === 'on_leave') ? AlertTriangle : Shield,
+                        color: data.proxyStatus && data.staffStats.details?.some(s => s.id === data.proxyStatus.proxy_id && s.status === 'on_leave') ? 'red' : 'violet',
+                        desc: data.proxyStatus && data.staffStats.details?.some(s => s.id === data.proxyStatus.proxy_id && s.status === 'on_leave') ? 'PROXY ON LEAVE!' : 'Delegated Authority'
                     },
                 ].map((item, i) => (
                     <motion.div
@@ -165,7 +255,7 @@ const HODDashboard = () => {
                             </div>
                         </div>
                         <p className="text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-[0.2em]">{item.label}</p>
-                        <p className="text-3xl font-black text-gray-900 dark:text-white mt-1 leading-none">{item.value}</p>
+                        <div className="text-3xl font-black text-gray-900 dark:text-white mt-1 leading-none">{item.value}</div>
                     </motion.div>
                 ))}
             </div>
@@ -182,8 +272,8 @@ const HODDashboard = () => {
                         </div>
                         <TrendingUp className="w-5 h-5 text-blue-500" />
                     </div>
-                    <div className="h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div className="h-[300px] w-full min-w-0 relative">
+                        <ResponsiveContainer width={500} height="100%" minWidth={10} minHeight={10} style={{ width: '99%' }}>
                             <BarChart data={data.yearStats}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" opacity={0.3} />
                                 <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 10, fontWeight: 800 }} />
@@ -219,6 +309,7 @@ const HODDashboard = () => {
                             <Activity className="w-8 h-8 text-amber-500/20" />
                         </div>
                     </div>
+
                     <button
                         onClick={() => navigate('/hod/staff')}
                         className="mt-6 w-full py-4 bg-gray-50 dark:bg-slate-800 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-blue-600 transition-all flex items-center justify-center gap-2"
@@ -228,44 +319,55 @@ const HODDashboard = () => {
                 </div>
             </div>
 
+
             {/* Delegation Modal */}
             <Modal
                 isOpen={showDelegationModal}
                 onClose={() => setShowDelegationModal(false)}
-                maxWidth="max-w-md"
-                showPadding={false}
+                title="Delegate Authority"
             >
-                <div className="p-8 bg-blue-600 text-white">
-                    <h3 className="text-2xl font-black tracking-tight">Authority Delegation</h3>
-                    <p className="text-blue-100 text-[10px] mt-1 uppercase tracking-widest font-black">Assign Assistant HOD Proxy</p>
-                </div>
-                <div className="p-8 space-y-6">
+                {delegationError && (
+                    <div className="bg-red-50 text-red-600 p-3 rounded-xl text-xs font-bold border border-red-100 flex items-center gap-2 mb-4 animate-shake">
+                        <AlertTriangle className="w-4 h-4 shrink-0" />
+                        {delegationError}
+                    </div>
+                )}
+                <form onSubmit={(e) => { e.preventDefault(); handleDelegation(); }} className="space-y-4">
                     <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Assistant HOD Delegate</label>
+                        <label className="text-[10px] uppercase font-bold text-gray-400">Select Assistant HOD (Proxy)</label>
                         <select
+                            className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border-none outline-none"
                             value={delegationForm.proxyId}
-                            onChange={(e) => setDelegationForm({ ...delegationForm, proxyId: e.target.value })}
-                            className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-xl p-4 mt-2 font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500 appearance-none dark:text-white"
+                            onChange={e => setDelegationForm({ ...delegationForm, proxyId: e.target.value })}
                         >
-                            <option value="">Select Faculty Member</option>
-                            {staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            <option value="">Select Staff...</option>
+                            {staff.map(s => <option key={s.id} value={s.id}>{s.name} ({s.email})</option>)}
                         </select>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Delegation Start</label>
-                            <input type="date" value={delegationForm.start} onChange={(e) => setDelegationForm({ ...delegationForm, start: e.target.value })} className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-xl p-4 mt-2 font-bold text-xs dark:text-white" />
+                            <label className="text-[10px] uppercase font-bold text-gray-400">Start Date</label>
+                            <input
+                                type="date"
+                                className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border-none outline-none"
+                                value={delegationForm.start}
+                                onChange={e => setDelegationForm({ ...delegationForm, start: e.target.value })}
+                            />
                         </div>
                         <div>
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Delegation End</label>
-                            <input type="date" value={delegationForm.end} onChange={(e) => setDelegationForm({ ...delegationForm, end: e.target.value })} className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-xl p-4 mt-2 font-bold text-xs dark:text-white" />
+                            <label className="text-[10px] uppercase font-bold text-gray-400">End Date</label>
+                            <input
+                                type="date"
+                                className="w-full p-3 bg-gray-50 dark:bg-slate-800 rounded-xl border-none outline-none"
+                                value={delegationForm.end}
+                                onChange={e => setDelegationForm({ ...delegationForm, end: e.target.value })}
+                            />
                         </div>
                     </div>
-                    <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                        <button onClick={() => setShowDelegationModal(false)} className="flex-1 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-2xl transition-all order-2 sm:order-1">Cancel</button>
-                        <button onClick={handleDelegation} className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black shadow-lg shadow-blue-500/30 hover:scale-105 transition-all uppercase tracking-widest order-1 sm:order-2">Enforce Delegation</button>
-                    </div>
-                </div>
+                    <button className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors">
+                        Confirm Delegation
+                    </button>
+                </form>
             </Modal>
         </div>
     );

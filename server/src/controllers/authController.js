@@ -8,6 +8,7 @@ exports.login = async (req, res) => {
     const password = req.body.password ? req.body.password.trim() : '';
 
     try {
+        console.log(`[LOGIN] Attempt for email: ${email}`);
         const [users] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
 
         if (users.length === 0) {
@@ -27,10 +28,45 @@ exports.login = async (req, res) => {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
 
+        // --- MAINTENANCE MODE CHECK ---
+        const [sysSettings] = await db.query('SELECT maintenance_mode FROM settings WHERE id = 1');
+        if (sysSettings.length > 0 && sysSettings[0].maintenance_mode) {
+            // Only 'admin' or 'principal' allowed during maintenance? Usually just admin.
+            // Let's allow Admin only as per request "Locks application for all non-admin users".
+            if (user.role !== 'admin') {
+                return res.status(503).json({
+                    message: 'System is currently in Emergency Maintenance Mode. Access is restricted to Administrators only.'
+                });
+            }
+        }
+
+        // --- ACCOUNT STATUS CHECK ---
+        // If Staff (or any employee role) is Suspended/Inactive, block login
+        // Student login is allowed (but restricted actions), as per requirements.
+        if (['staff', 'hod', 'warden', 'principal', 'admin'].includes(user.role) && user.status && ['suspended', 'inactive'].includes(user.status.toLowerCase())) {
+            return res.status(403).json({ message: `Access Denied: Your account is ${user.status}. Please contact the Administrator.` });
+        }
+
+        const rememberMe = req.body.rememberMe === true;
+        const expiresIn = rememberMe ? '30d' : '24h';
+
+        // Check if user is an active PROXY (Assistant HOD)
+        const [proxyCheck] = await db.query(
+            'SELECT 1 FROM proxy_settings WHERE proxy_id = ? AND is_active = TRUE AND CURDATE() BETWEEN start_date AND end_date',
+            [user.id]
+        );
+        const isProxyActive = proxyCheck.length > 0;
+
         const token = jwt.sign(
-            { id: user.id, role: user.role, name: user.name, department_id: user.department_id },
+            {
+                id: user.id,
+                role: user.role,
+                name: user.name,
+                department_id: user.department_id,
+                is_proxy_active: isProxyActive
+            },
             process.env.JWT_SECRET,
-            { expiresIn: '24h' }
+            { expiresIn }
         );
 
         res.json({
@@ -67,10 +103,38 @@ exports.login = async (req, res) => {
 exports.getMe = async (req, res) => {
     try {
         if (!req.user) {
-            // Should be caught by verifyToken, but double check
             return res.status(401).json({ message: 'Not authenticated' });
         }
-        res.json({ user: req.user });
+
+        const [users] = await db.query('SELECT * FROM users WHERE id = ?', [req.user.id]);
+        if (users.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const user = users[0];
+
+        // Check if user is an active PROXY (Assistant HOD)
+        const [proxyCheck] = await db.query(
+            'SELECT 1 FROM proxy_settings WHERE proxy_id = ? AND is_active = TRUE AND CURDATE() BETWEEN start_date AND end_date',
+            [user.id]
+        );
+        const isProxyActive = proxyCheck.length > 0;
+
+        res.json({
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                department_id: user.department_id,
+                trust_score: user.trust_score,
+                student_type: user.student_type,
+                register_number: user.register_number,
+                year: user.year,
+                phone: user.phone,
+                is_proxy_active: isProxyActive
+            }
+        });
     } catch (error) {
         console.error('getMe Error:', error);
         res.status(500).json({ message: 'Error fetching user session: ' + error.message });
@@ -118,10 +182,18 @@ exports.sendResetOTP = async (req, res) => {
 
         await db.query('UPDATE users SET reset_otp = ?, reset_otp_expiry = ? WHERE id = ?', [otp, expiry, user.id]);
 
-        const whatsappService = require('../services/whatsappService');
-        await whatsappService.sendWhatsApp(user.phone, `Your UniVerse GateKeeper Password Reset OTP is: *${otp}*. Valid for 10 minutes.`);
+        // Use centralized notification system with fallback
 
-        res.json({ message: 'OTP sent successfully to your WhatsApp number' });
+        await createNotification(
+            user.id,
+            'Password Reset OTP',
+            `Your security code for Password Reset is: ${otp}. Valid for 10 minutes.`,
+            'info',
+            null,
+            'otp' // Category 'otp' triggers the strict WhatsApp + SMS logic
+        );
+
+        res.json({ message: 'OTP sent successfully via WhatsApp (or SMS fallback)' });
     } catch (error) {
         console.error('OTP Send Error:', error);
         res.status(500).json({ message: 'Failed to send OTP: ' + error.message });
@@ -171,15 +243,23 @@ exports.forgotEmailInit = async (req, res) => {
 
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
         // Update all users with this phone (to handle siblings/family)
         const userIds = users.map(u => u.id);
         await db.query('UPDATE users SET reset_otp = ?, reset_otp_expiry = ? WHERE id IN (?)', [otp, expiry, userIds]);
 
-        const whatsappService = require('../services/whatsappService');
-        await whatsappService.sendWhatsApp(users[0].phone, `Your UniVerse GateKeeper Email Recovery OTP is: *${otp}*. Valid for 10 minutes.`);
+        const { createNotification } = require('./notificationController');
 
-        res.json({ success: true, message: 'OTP sent to your WhatsApp number' });
+        // Notify one user to deliver the message to the phone number
+        await createNotification(
+            users[0].id,
+            'Email Recovery OTP',
+            `Your OTP for Email Recovery is: ${otp}. Valid for 10 minutes.`,
+            'info',
+            null,
+            'otp'
+        );
+
+        res.json({ success: true, message: 'OTP sent to your WhatsApp number (or SMS)' });
     } catch (error) {
         console.error('Forgot Email Init Error:', error);
         res.status(500).json({ message: 'Failed to send OTP: ' + error.message });
@@ -208,5 +288,36 @@ exports.verifyForgotEmailOTP = async (req, res) => {
         res.json({ success: true, emails });
     } catch (error) {
         res.status(500).json({ message: error.message });
+    }
+};
+
+exports.changePassword = async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user.id;
+
+    if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: 'Both current and new passwords are required' });
+    }
+
+    try {
+        const [users] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+        if (users.length === 0) return res.status(404).json({ message: 'User not found' });
+
+        const user = users[0];
+        const dbPassword = user.password_hash || user.password;
+
+        const isMatch = await bcrypt.compare(currentPassword, dbPassword);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Incorrect current password' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hash = await bcrypt.hash(newPassword, salt);
+
+        await db.query('UPDATE users SET password_hash = ? WHERE id = ?', [hash, userId]);
+        res.json({ message: 'Password updated successfully' });
+    } catch (error) {
+        console.error('Change Password Error:', error);
+        res.status(500).json({ message: 'Server error: ' + error.message });
     }
 };

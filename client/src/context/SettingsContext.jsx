@@ -14,7 +14,8 @@ export const SettingsProvider = ({ children }) => {
         theme_secondary: '#10B981', // Emerald-500
         maintenance_mode: false,
         allow_registration: true,
-        announcement_text: ''
+        announcement_text: '',
+        login_background: null
     });
     const [loading, setLoading] = useState(true);
 

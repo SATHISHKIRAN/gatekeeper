@@ -43,7 +43,7 @@ const StaffHistory = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Approval History</h1>
-                    <p className="text-gray-500 dark:text-slate-400">Record of all requests processed by your department ({total} total)</p>
+                    <p className="text-gray-500 dark:text-slate-400">Record of all requests processed for your mentees ({total} total)</p>
                 </div>
                 <div className="flex gap-3">
                     <div className="relative">
@@ -90,6 +90,7 @@ const StaffHistory = () => {
                                         <td className="p-4">
                                             <div>
                                                 <p className="font-bold text-gray-900 dark:text-white">{item.student_name}</p>
+                                                <p className="text-xs text-gray-500 dark:text-slate-500">{item.student_phone}</p>
                                                 <p className="text-xs text-gray-500 dark:text-slate-500">Year {item.year}</p>
                                             </div>
                                         </td>
@@ -104,7 +105,7 @@ const StaffHistory = () => {
                                             <span className="block text-xs text-gray-400">{new Date(item.departure_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                         </td>
                                         <td className="p-4">
-                                            <span className={`px-2 py-1 rounded-lg text-xs font-bold capitalize ${item.status.includes('approved') ? 'bg-green-100 text-green-700' :
+                                            <span className={`px-2 py-1 rounded-lg text-xs font-bold capitalize ${['active', 'generated', 'completed'].includes(item.status) || item.status.includes('approved') ? 'bg-green-100 text-green-700' :
                                                 item.status === 'rejected' ? 'bg-red-100 text-red-700' :
                                                     'bg-yellow-100 text-yellow-700'
                                                 }`}>

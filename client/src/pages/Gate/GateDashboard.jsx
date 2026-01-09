@@ -49,11 +49,11 @@ const GateDashboard = () => {
             >
                 <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                        <QrCode className="w-8 h-8 text-white" />
+                        <Users className="w-8 h-8 text-white" />
                     </div>
                     <div className="text-left">
-                        <h2 className="text-xl font-black">Open Scanner</h2>
-                        <p className="text-indigo-200">Process Entry / Exit Requests</p>
+                        <h2 className="text-xl font-black">Gate Terminal</h2>
+                        <p className="text-indigo-200">Verify Entry / Exit by Register Number</p>
                     </div>
                 </div>
                 <ArrowRight className="w-8 h-8 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition" />
