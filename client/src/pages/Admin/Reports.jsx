@@ -543,41 +543,37 @@ const AdminReports = () => {
                                                                 <div className="w-24 h-24 bg-slate-50 dark:bg-slate-800/50 rounded-full flex items-center justify-center mb-6 border-4 border-white dark:border-slate-800 shadow-inner">
                                                                     <Search className="w-10 h-10 text-slate-300 dark:text-slate-600" />
                                                                 </div>
-                                                                <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-widest">No Logs Found</h3>
-                                                                <p className="text-slate-500 dark:text-slate-400 max-w-sm mt-4 font-medium leading-relaxed">
-                                                                    Configure your filters and click <span className="text-indigo-600 font-bold italic">Generate Report</span> to visualize movement data.
-                                                                </p>
                                                             </div>
-                                                        )}
+                                        </div>
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tfoot className="print-footer-row">
+                                            <tr>
+                                                <td>
+                                                    <div className="flex justify-between items-end mt-12 px-8 pb-4">
+                                                        <div className="text-center">
+                                                            <div className="h-12 w-32 border-b-2 border-slate-300 mb-2"></div>
+                                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Class In-charge</p>
+                                                        </div>
+                                                        <div className="text-center">
+                                                            <div className="h-12 w-32 border-b-2 border-slate-300 mb-2"></div>
+                                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">HOD Signature</p>
+                                                        </div>
+                                                        <div className="text-center">
+                                                            <div className="h-12 w-32 border-b-2 border-slate-300 mb-2"></div>
+                                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Principal / CTO</p>
+                                                        </div>
                                                     </div>
-
-                                                    <tfoot className="print-footer-row">
-                                                        <tr>
-                                                            <td colSpan="5">
-                                                                <div className="flex justify-between items-end mt-12 px-8 pb-4">
-                                                                    <div className="text-center">
-                                                                        <div className="h-12 w-32 border-b-2 border-slate-300 mb-2"></div>
-                                                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Class In-charge</p>
-                                                                    </div>
-                                                                    <div className="text-center">
-                                                                        <div className="h-12 w-32 border-b-2 border-slate-300 mb-2"></div>
-                                                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">HOD Signature</p>
-                                                                    </div>
-                                                                    <div className="text-center">
-                                                                        <div className="h-12 w-32 border-b-2 border-slate-300 mb-2"></div>
-                                                                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Principal / CTO</p>
-                                                                    </div>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    </tfoot>
-                                                </table>
-                                            </div>
-                                        </>
-                )}
-                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
                                 </div>
-                                );
+                )}
+                            </div>
+                    </div>
+                );
 };
 
-                                export default AdminReports;
+                export default AdminReports;
