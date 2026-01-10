@@ -39,8 +39,9 @@ exports.sendPushNotification = async (userId, payload) => {
 
             return webpush.sendNotification(subscription, notificationPayload)
                 .catch(err => {
-                    if (err.statusCode === 404 || err.statusCode === 410) {
-                        console.log('Push subscription expired or unsubscribed, removing...');
+                    // 410 = Gone, 404 = Not Found, 401 = Invalid Signature (Key mismatch)
+                    if (err.statusCode === 404 || err.statusCode === 410 || err.statusCode === 401) {
+                        console.log(`Push subscription invalid (${err.statusCode}), removing...`);
                         return db.query('DELETE FROM push_subscriptions WHERE subscription = ?', [JSON.stringify(subscription)]);
                     }
                     console.error('Push notification failed:', err);

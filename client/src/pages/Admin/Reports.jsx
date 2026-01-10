@@ -415,133 +415,90 @@ const AdminReports = () => {
                                                     <h1 className="text-xl font-black uppercase leading-none mb-1">{settings?.app_name || 'System Report'}</h1>
                                                     <p className="text-[10px] uppercase font-bold text-slate-600 px-0.5">Administrative Report Log</p>
                                                 </div>
-                                                <div className={`${showFilters ? 'lg:col-span-3' : 'lg:col-span-4'} flex flex-col gap-6 print:w-full`}>
-                                                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] shadow-sm overflow-hidden min-h-[500px] flex flex-col print:hidden">
-                                                        <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-sm">
-                                                            <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm flex items-center gap-3">
-                                                                <FileBarChart className="w-5 h-5 text-indigo-500" />
-                                                                Movement Logs Table
-                                                            </h3>
-                                                            <span className="px-4 py-1.5 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-full text-[10px] font-black uppercase tracking-widest">
-                                                                {reportData.length} records found
-                                                            </span>
-                                                        </div>
+                                            </div>
+                                        </div>
 
-                                                        {reportData.length > 0 ? (
-                                                            <>
-                                                                <div className="overflow-x-auto flex-1">
-                                                                    <table className="w-full text-left border-collapse">
-                                                                        <thead>
-                                                                            <tr className="bg-slate-50/30 dark:bg-slate-800/20 border-b border-slate-100 dark:border-slate-800">
-                                                                                <th className="p-6 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Student Information</th>
-                                                                                <th className="p-6 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Department</th>
-                                                                                <th className="p-6 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Pass Type</th>
-                                                                                <th className="p-6 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Status</th>
-                                                                                <th className="p-6 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Timeline</th>
-                                                                            </tr>
-                                                                        </thead>
-                                                                        <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                                                                            {currentItems.map((item) => (
-                                                                                <tr key={item.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-all">
-                                                                                    <td className="p-6">
-                                                                                        <div className="flex items-center gap-3">
-                                                                                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-black text-sm shadow-lg shadow-indigo-500/20">
-                                                                                                {item.student_name.charAt(0)}
-                                                                                            </div>
-                                                                                            <div>
-                                                                                                <div className="font-black text-slate-900 dark:text-white text-sm group-hover:text-indigo-600 transition-colors">{item.student_name}</div>
-                                                                                                <div className="text-[10px] font-bold text-slate-500 tracking-tighter mt-0.5">{item.register_number} (Yr {item.year})</div>
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    </td>
-                                                                                    <td className="p-6">
-                                                                                        <div className="flex flex-col gap-1">
-                                                                                            <div className="text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                                                                                                {item.department_name}
-                                                                                            </div>
-                                                                                            <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                                                                                                {item.hostel_name || 'No Hostel'}
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    </td>
-                                                                                    <td className="p-6">
-                                                                                        <span className={`px-3 py-1 rounded-lg text-[10px] font-black tracking-widest uppercase ${item.type === 'Emergency'
-                                                                                            ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400'
-                                                                                            : 'bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400'
-                                                                                            }`}>
-                                                                                            {item.type}
-                                                                                        </span>
-                                                                                    </td>
-                                                                                    <td className="p-6">
-                                                                                        <div className="flex items-center gap-2">
-                                                                                            <div className={`w-2 h-2 rounded-full ${item.status === 'completed' ? 'bg-emerald-500' :
-                                                                                                item.status === 'rejected' ? 'bg-rose-500' :
-                                                                                                    item.status === 'pending' ? 'bg-amber-500 animate-pulse' : 'bg-indigo-500'
-                                                                                                }`} />
-                                                                                            <span className="text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest">
-                                                                                                {item.status.replace('_', ' ')}
-                                                                                            </span>
-                                                                                        </div>
-                                                                                    </td>
-                                                                                    <td className="p-6">
-                                                                                        <div className="flex flex-col gap-1.5">
-                                                                                            <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600 dark:text-slate-400 border-l-2 border-slate-200 dark:border-slate-800 pl-3">
-                                                                                                <span className="text-slate-400 uppercase tracking-tighter">OUT</span>
-                                                                                                {new Date(item.departure_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                                                                            </div>
-                                                                                            <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600 dark:text-slate-400 border-l-2 border-indigo-500 pl-3">
-                                                                                                <span className="text-indigo-400 uppercase tracking-tighter">RET</span>
-                                                                                                {new Date(item.return_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    </td>
-                                                                                </tr>
-                                                                            ))}
-                                                                        </tbody>
-                                                                    </table>
-                                                                </div>
+                                        <div className="w-full flex flex-col gap-6 print:w-full">
+                                            <div className="border border-slate-200 rounded-[2rem] overflow-hidden flex flex-col">
+                                                <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                                                    <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm flex items-center gap-3">
+                                                        <FileBarChart className="w-5 h-5 text-indigo-500" />
+                                                        Movement Logs Table
+                                                    </h3>
+                                                    <span className="px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest">
+                                                        {printData.length} records found
+                                                    </span>
+                                                </div>
 
-                                                                {/* Pagination Controls */}
-                                                                <div className="p-6 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-                                                                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                                                        Showing <span className="text-slate-900 dark:text-white">{indexOfFirstItem + 1}</span> - <span className="text-slate-900 dark:text-white">{Math.min(indexOfLastItem, reportData.length)}</span> of <span className="text-slate-900 dark:text-white">{reportData.length}</span>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <button
-                                                                            onClick={() => paginate(currentPage - 1)}
-                                                                            disabled={currentPage === 1}
-                                                                            className="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                                                                        >
-                                                                            Previous
-                                                                        </button>
-                                                                        <div className="hidden sm:flex items-center gap-1">
-                                                                            {[...Array(Math.ceil(reportData.length / itemsPerPage))].map((_, i) => (
-                                                                                <button
-                                                                                    key={i + 1}
-                                                                                    onClick={() => paginate(i + 1)}
-                                                                                    className={`w-8 h-8 rounded-lg text-xs font-black transition-all ${currentPage === i + 1
-                                                                                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
-                                                                                        : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-                                                                                        }`}
-                                                                                >
-                                                                                    {i + 1}
-                                                                                </button>
-                                                                            )).slice(Math.max(0, currentPage - 3), Math.min(Math.ceil(reportData.length / itemsPerPage), currentPage + 2))}
+                                                <div className="overflow-x-auto flex-1">
+                                                    <table className="w-full text-left border-collapse">
+                                                        <thead>
+                                                            <tr className="bg-slate-50/30 border-b border-slate-100">
+                                                                <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Student Information</th>
+                                                                <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Department</th>
+                                                                <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Pass Type</th>
+                                                                <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                                                                <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Timeline</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-50">
+                                                            {printData.map((item) => (
+                                                                <tr key={item.id} className="group hover:bg-slate-50/50">
+                                                                    <td className="p-6">
+                                                                        <div className="flex items-center gap-3">
+                                                                            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-900 font-black text-sm">
+                                                                                {item.student_name.charAt(0)}
+                                                                            </div>
+                                                                            <div>
+                                                                                <div className="font-black text-slate-900 text-sm">{item.student_name}</div>
+                                                                                <div className="text-[10px] font-bold text-slate-500 tracking-tighter mt-0.5">{item.register_number} (Yr {item.year})</div>
+                                                                            </div>
                                                                         </div>
-                                                                        <button
-                                                                            onClick={() => paginate(currentPage + 1)}
-                                                                            disabled={currentPage === Math.ceil(reportData.length / itemsPerPage)}
-                                                                            className="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                                                                        >
-                                                                            Next
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                        )}
-                                                            </div>
-                                                    </div>
+                                                                    </td>
+                                                                    <td className="p-6">
+                                                                        <div className="flex flex-col gap-1">
+                                                                            <div className="text-[10px] font-black text-slate-700 uppercase tracking-wider">
+                                                                                {item.department_name}
+                                                                            </div>
+                                                                            <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                                                                {item.hostel_name || 'No Hostel'}
+                                                                            </div>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="p-6">
+                                                                        <span className={`px-3 py-1 rounded-lg text-[10px] font-black tracking-widest uppercase ${item.type === 'Emergency'
+                                                                            ? 'bg-rose-50 text-rose-600'
+                                                                            : 'bg-sky-50 text-sky-600'
+                                                                            }`}>
+                                                                            {item.type}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="p-6">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">
+                                                                                {item.status.replace('_', ' ')}
+                                                                            </span>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="p-6">
+                                                                        <div className="flex flex-col gap-1.5">
+                                                                            <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600 border-l-2 border-slate-200 pl-3">
+                                                                                <span className="text-slate-400 uppercase tracking-tighter">OUT</span>
+                                                                                {new Date(item.departure_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600 border-l-2 border-indigo-500 pl-3">
+                                                                                <span className="text-indigo-400 uppercase tracking-tighter">RET</span>
+                                                                                {new Date(item.return_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                                            </div>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
                                                 </div>
                                             </div>
+                                        </div>
                                     </th>
                                 </tr>
                             </thead>

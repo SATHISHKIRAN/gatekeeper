@@ -17,21 +17,25 @@ export default defineConfig({
         port: 5173,
         https: true, // Explicitly enable HTTPS
         hmr: {
-            host: '10.160.140.145', // Force HMR to use the LAN IP
+            // Let the browser determine the HMR host (auto-detected from URL)
+            // Manually forcing IP often breaks if the IP changes or when using proxies
         },
         proxy: {
             '/api': {
                 target: 'http://127.0.0.1:5000',
                 changeOrigin: true,
+                secure: false // Allow proxy to HTTP backend
             },
             '/uploads': {
                 target: 'http://127.0.0.1:5000',
                 changeOrigin: true,
+                secure: false
             },
             '/socket.io': {
                 target: 'http://127.0.0.1:5000',
                 changeOrigin: true,
-                ws: true
+                ws: true,
+                secure: false
             }
         }
     },
@@ -41,6 +45,7 @@ export default defineConfig({
             '/api': {
                 target: 'http://127.0.0.1:5000',
                 changeOrigin: true,
+                secure: false
             }
         }
     }

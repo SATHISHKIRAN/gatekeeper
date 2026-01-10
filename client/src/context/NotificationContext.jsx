@@ -156,16 +156,41 @@ export const NotificationProvider = ({ children }) => {
             // 2. Check for existing subscription
             let subscription = await registration.pushManager.getSubscription();
 
-            // 3. Subscribe only if not already subscribed
+            // 3. Verify VAPID Key Consistency
+            if (subscription) {
+                const currentKey = subscription.options.applicationServerKey;
+                if (currentKey) {
+                    const newKeyArray = urlBase64ToUint8Array(publicVapidKey);
+                    const existingKeyArray = new Uint8Array(currentKey);
+
+                    let keysMatch = true;
+                    if (newKeyArray.length !== existingKeyArray.length) {
+                        keysMatch = false;
+                    } else {
+                        for (let i = 0; i < newKeyArray.length; i++) {
+                            if (newKeyArray[i] !== existingKeyArray[i]) {
+                                keysMatch = false;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!keysMatch) {
+                        console.log('[Push] VAPID Key changed. Re-subscribing...');
+                        await subscription.unsubscribe();
+                        subscription = null;
+                    }
+                }
+            }
+
+            // 4. Subscribe if needed
             if (!subscription) {
                 subscription = await registration.pushManager.subscribe({
                     userVisibleOnly: true,
                     applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
                 });
             } else {
-                // Should we verify if the existing subscription key matches the new VAPID key?
-                // For now, assume it's valid to avoid churn.
-                // console.log('Using existing subscription');
+                console.log('[Push] Subscription valid via existing key');
             }
 
             // 4. Send subscription to server
