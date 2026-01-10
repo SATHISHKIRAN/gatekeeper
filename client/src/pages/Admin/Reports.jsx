@@ -537,18 +537,11 @@ const AdminReports = () => {
                                                                         </button>
                                                                     </div>
                                                                 </div>
-                                                            </>
-                                                        ) : (
-                                                            <div className="flex-1 flex flex-col items-center justify-center p-20 text-center">
-                                                                <div className="w-24 h-24 bg-slate-50 dark:bg-slate-800/50 rounded-full flex items-center justify-center mb-6 border-4 border-white dark:border-slate-800 shadow-inner">
-                                                                    <Search className="w-10 h-10 text-slate-300 dark:text-slate-600" />
-                                                                </div>
-                                                            </div>
                                                         )}
+                                                            </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
                                     </th>
                                 </tr>
                             </thead>
